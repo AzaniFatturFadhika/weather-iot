@@ -1,0 +1,133 @@
+// Physical ERD for Weather IoT Monitoring System v2.0.0
+// Compatible with dbdiagram.io
+// Database Type: MySQL
+
+Project WeatherIoT_v2 {
+  database_type: 'MySQL'
+  Note: 'Physical ERD for Weather IoT Monitoring System v2.0.0 including legacy, IoT, API, and ML tables.'
+}
+
+// ==========================================
+// Legacy Tables (from weather_app_bd.sql)
+// ==========================================
+
+Table historical_dataset {
+  id int [pk, increment]
+  day int
+  month int
+  year int
+  tempmax float
+  tempmin float
+  temp float
+  humidity float
+  windspeed float
+  sealevelpressure float
+  conditions varchar(255)
+  
+  Note: "Stores daily aggregated historical weather data for ML training."
+}
+
+Table users {
+  id int [pk, increment]
+  username varchar(255)
+  password varchar(255)
+  email varchar(255) [unique]
+  role varchar(255) // 'admin', 'viewer'
+  createAt timestamp [default: `current_timestamp`]
+}
+
+Table otp {
+  id int [pk, increment]
+  email varchar(255) [unique]
+  otp int
+  createAt timestamp [default: `current_timestamp`]
+}
+
+Ref: users.email - otp.email // Constraint from original SQL
+
+// ==========================================
+// New IoT Tables (v2.0.0 Architecture)
+// ==========================================
+
+Table stations {
+  station_id varchar(50) [pk, note: "Unique Hardware ID, e.g., TX001"]
+  name varchar(100) [note: "Friendly name, e.g., 'Kec. Semarang Utara'"]
+  latitude decimal(10,8)
+  longitude decimal(11,8)
+  elevation float [note: "Height above sea level in meters"]
+  is_active boolean [default: true]
+  last_seen timestamp [null]
+  created_at timestamp [default: `current_timestamp`]
+  
+  Note: "Registry of all physical weather station transmitters."
+}
+
+Table weather_observations {
+  id bigint [pk, increment]
+  station_id varchar(50) [not null]
+  gateway_id varchar(50) [note: "ID of the Gateway receiving the data"]
+  observation_date datetime [not null, note: "Timestamp from the sensor/gateway (ISO 8601)"]
+  
+  // Sensor Data (QuantitativeValue)
+  temperature float [note: "Celsius"]
+  humidity float [note: "Relative Humidity %"]
+  pressure float [note: "hPa (Pascal)"]
+  wind_speed float [note: "m/s"]
+  rain_level float [note: "Analog value (0-1023)"]
+  light_lux float [note: "Analog value (0-1023)"]
+  uv_index float [note: "UV Index"]
+  
+  // LoRa Metadata
+  rssi int [note: "Received Signal Strength Indicator"]
+  snr float [note: "Signal-to-Noise Ratio"]
+  
+  created_at timestamp [default: `current_timestamp`, note: "Server insertion time"]
+  
+  Note: "High-frequency real-time sensor data from MQTT stream."
+}
+
+// ==========================================
+// External API & ML Prediction Tables
+// ==========================================
+
+Table external_forecasts {
+  id bigint [pk, increment]
+  source varchar(50) [note: "e.g., 'OpenWeatherMap', 'BMKG'"]
+  latitude decimal(10,8)
+  longitude decimal(11,8)
+  forecast_date datetime [note: "Target date/time of the forecast"]
+  
+  temperature float
+  humidity float
+  pressure float
+  wind_speed float
+  condition_text varchar(100) [note: "e.g., 'Light Rain'"]
+  
+  fetched_at timestamp [default: `current_timestamp`]
+  
+  Note: "Forecast data fetched from external open-source APIs for comparison."
+}
+
+Table weather_predictions {
+  id bigint [pk, increment]
+  station_id varchar(50) [null, note: "Null if regional prediction"]
+  prediction_date datetime [note: "Target date for the prediction"]
+  
+  // Predicted Values
+  temp_max float
+  temp_min float
+  temp_avg float
+  humidity float
+  wind_speed float
+  pressure float
+  condition_text varchar(100)
+  
+  model_version varchar(50) [note: "e.g., 'RF_v1.0'"]
+  created_at timestamp [default: `current_timestamp`]
+  
+  Note: "ML model predictions based on historical and real-time data."
+}
+
+// Relationships
+Ref: weather_observations.station_id > stations.station_id [delete: cascade, update: cascade]
+Ref: weather_predictions.station_id > stations.station_id [delete: set null]
