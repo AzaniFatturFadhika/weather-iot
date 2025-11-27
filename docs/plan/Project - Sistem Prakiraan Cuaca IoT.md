@@ -69,206 +69,126 @@ Saat ini implementasi berfokus di Gazipur (Bangladesh) sehingga generalisasi lin
 # Arsitektur Sistem
 
 ---
-Berikut rancangan arsitektur sistem lengkap—disusun setia pada isi artikel (node sensor ber-LoRa, gateway ESP32, backend FastAPI+MySQL, app Flutter, prediksi cuaca Random Forest)—ditambah rincian estimasi biaya berbasis harga pasar Indonesia (Okt 2025).
+Berikut rancangan arsitektur sistem lengkap—disesuaikan dengan implementasi v2.0.0 yang menggunakan standar industri (Schema.org), komunikasi MQTT, dan sensor presisi tinggi.
 
-## 1) Ringkasan arsitektur dari artikel
+## 1) Ringkasan Arsitektur v2.0.0
 
-- **Node sensor**: Arduino UNO + modul LoRa (Ai-Thinker RA-02) membaca **anemometer (kecepatan angin), sensor hujan, DHT21/AM2301 (suhu-kelembapan), BMP180 (tekanan), LDR (cahaya)**. Data dikirim via LoRa.
+- **Node Sensor (Transmitter)**: Arduino Nano + modul LoRa (SX1278/RA-02) membaca **AHT20 (suhu-kelembapan), BMP280 (tekanan), Anemometer (kecepatan angin), Rain sensor, LDR**. Data dikirim via LoRa dengan validasi CRC8.
     
-- **Gateway**: **ESP32** menerima LoRa dari node dan meneruskan ke server melalui Wi-Fi.
+- **Gateway**: **ESP32-S3** menerima paket LoRa, melakukan validasi, sinkronisasi waktu (NTP), dan mempublikasikan data via **MQTT** ke broker.
     
-- **Backend**: **FastAPI** (REST) + **MySQL** untuk koleksi & penyajian data; mengekspose endpoint ke aplikasi.
+- **Broker**: **EMQX** (atau broker MQTT publik/lokal lainnya) sebagai perantara pesan.
     
-- **Aplikasi**: **Flutter** (Android) menampilkan realtime, histori & prediksi.
+- **Backend/Subscriber**: Layanan yang subscribe ke topik MQTT untuk menyimpan data ke database (MySQL/PostgreSQL) dan melayani API.
     
-- **Prediksi**: **Random Forest** dipakai untuk peramalan cuaca; sistem dirancang agar **pembelajaran bertahap (incremental)** ketika data baru masuk.
+- **Aplikasi**: **Flutter** (Android) atau Dashboard Web yang mengambil data real-time via MQTT atau API.
     
-- **Motivasi LoRa**: jangkauan jauh, biaya rendah, konsumsi daya kecil.
-    
+- **Standar Data**: Menggunakan format JSON-LD **Schema.org/WeatherObservation** dengan kode unit UN/CEFACT.
 
-## 2) Diagram arsitektur (logis)
+## 2) Diagram Arsitektur (Logis)
 
 ```
-[Node Sensor (Arduino UNO)]
-  ├─ DHT21  ──┐
-  ├─ BMP180 ──┤
-  ├─ Anemometer
-  ├─ Rain sensor
-  └─ LDR     └─> [Modul LoRa (RA-02)]
-                     ↓ LoRa (sub-GHz)
-               [Gateway ESP32 + LoRa]
-                     ↓ Wi-Fi (HTTP)
-             [FastAPI REST API Server]
-                     ↓
-         [MySQL] <-> [Servis Prediksi RF]
-                     ↓
-               [Aplikasi Flutter]
-         (Realtime, histori, prediksi)
+[Node Sensor (Arduino Nano)]
+  ├─ AHT20 (I2C) ──┐
+  ├─ BMP280 (I2C) ─┤
+  ├─ Anemometer (Analog)
+  ├─ Rain sensor (Digital)
+  └─ LDR (Analog)  └─> [Modul LoRa (SX1278)]
+                         ↓ LoRa 433MHz (CRC8 Checked)
+                   [Gateway ESP32-S3 + LoRa]
+                         ↓ WiFi
+                   [MQTT Broker (EMQX)]
+                         ↓
+            ┌────────────┴─────────────┐
+            ↓                          ↓
+    [Backend Service]            [Mobile App]
+    (Storage & API)            (Realtime Monitor)
 ```
 
-## 3) Diagram deployment (fisik)
+## 3) Diagram Deployment (Fisik)
 
 ```
-[Lapangan]
-  ├─ 1..N Node Sensor + RA-02  ── LoRa ──┐
-  └─ Tiang/Enclosure IP65              [Gateway ESP32 + LoRa + Antena]
-                                        │ Wi-Fi/ETH
-                                        ▼
-[Infrastruktur]
-  [VPS Indonesia] ─ Docker:
-    - FastAPI (API & Auth)
-    - Servis Prediksi (Random Forest)
-    - MySQL (data meteorologi)
-    - Reverse proxy + TLS
+[Lapangan - Station 1..N]
+  ├─ Transmitter Unit (IP65 Box)
+  │   └─ Arduino Nano + Sensors + LoRa
+  └─ Power: Solar Panel + Battery 18650
+
+[Base Station / Indoor]
+  └─ Gateway Unit
+      └─ ESP32-S3 + LoRa + WiFi
+
+[Cloud / Server]
+  └─ MQTT Broker
+  └─ Database & API Server
 ```
 
-## 4) Desain tiap lapisan & keputusan teknis
+## 4) Desain Tiap Lapisan & Keputusan Teknis
 
-**Perangkat lapangan (node)**
+**Perangkat Lapangan (Transmitter)**
 
-- **MCU**: Arduino UNO (sesuai artikel). **Catatan regulasi**: di Indonesia LoRaWAN menggunakan **AS923-2 (±920–923 MHz)**; RA-02 umumnya varian **433 MHz**. Untuk kepatuhan, disarankan mengganti ke modul LoRa **AS923-2/915 MHz (mis. RFM95/SX1276, REYAX RYLR8xx)** pada node & gateway. ([read.uberflip.com](https://read.uberflip.com/i/1540208/81?utm_source=chatgpt.com "Document - RP002-1.0.5 LoRaWAN Regional Parameters"))
-    
-- **Sensor**: anemometer (kecepatan angin), rain sensor, DHT21, BMP180, LDR; dirangkai pada shield/PCB dan dimasukkan ke **enclosure IP65**.
-    
-
-**Komunikasi**
-
-- **LoRa point-to-point** dari node ke gateway (bukan LoRaWAN publik), laju data rendah, periodik. (Alternatif: LoRaWAN AS923-2 bila ingin pakai jaringan Telkom/Antares). ([docs.antares.id](https://docs.antares.id/en/contoh-kode-dan-library/register-perangkat-lorawan?utm_source=chatgpt.com "LoRaWAN Device Register | Antares"))
-    
+- **MCU**: Arduino Nano (ATmega328P). Dipilih karena hemat daya, murah, dan cukup untuk akuisisi data sensor dasar.
+- **Sensor Utama**: 
+    - **AHT20**: Akurasi tinggi untuk suhu & kelembapan (pengganti DHT).
+    - **BMP280**: Tekanan udara presisi.
+- **Komunikasi**: LoRa Point-to-Point dengan protokol kustom (Struct data + CRC8 checksum) untuk efisiensi dan integritas data.
 
 **Gateway**
 
-- **ESP32 + modul LoRa**; firmware meneruskan payload via **HTTP** ke FastAPI (bisa ditambah **MQTT** opsional untuk skalabilitas).
-    
+- **MCU**: ESP32-S3. Dual core, WiFi+Bluetooth, performa tinggi untuk handle LoRa packet processing dan koneksi MQTT stabil.
+- **Fungsi**: 
+    - Menerima raw packet LoRa.
+    - Validasi checksum.
+    - Menambahkan timestamp (NTP) dan geolokasi stasiun.
+    - Konversi ke format JSON Schema.org.
+    - Publish ke topik MQTT `weather/station/data`.
 
-**Backend**
+**Protokol Data**
 
-- **FastAPI**: endpoint ingest (POST), query (GET), auth (JWT). **MySQL** menyimpan metrik waktu-nyata & histori; indeks per waktu & lokasi.
-    
-- **Servis Prediksi**: model **Random Forest** dilatih awal dari histori; **refit periodik** (harian/mingguan) memakai data terbaru (sesuai semangat incremental di artikel). Expose `/predict` untuk app.
-    
+- **Format**: JSON-LD (Lightweight Linked Data).
+- **Standar**: Schema.org `WeatherObservation`.
+- **Unit**: UN/CEFACT (e.g., `CEL` untuk Celsius, `P1` untuk Persen).
 
-**Aplikasi Flutter**
+## 5) Estimasi Biaya (IDR, Estimasi 2025)
 
-- Tiga layar inti: **Realtime** (terima data terkini), **Historis** (grafik), **Prediksi** (hasil RF).
-    
+### 5.1 Bill of Materials – **Transmitter (1 unit)**
 
-**Keamanan & operasi**
-
-- **TLS** end-to-end (gateway→server), **JWT** untuk app, **rotasi API key** perangkat.
-    
-- **Kalibrasi sensor** (angin/hujan), **backup DB** harian, **monitoring** (health, latensi, loss paket).
-    
-- **OTA** ke gateway ESP32 via Wi-Fi.
-    
-
-## 5) Estimasi biaya (IDR, harga Indonesia per Okt 2025)
-
-> Harga bervariasi antar toko & kota; saya berikan **rentang & contoh tautan produk** sebagai rujukan.
-
-### 5.1 Bill of Materials – **Node Sensor (1 unit)**
-
-| Komponen                                           | Perkiraan Harga (IDR) | Sumber                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| -------------------------------------------------- | --------------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Arduino UNO R3 kompatibel (CH340)                  |    **57.500–120.000** | Blibli Rp120.000 (Ori/CH340) ([Blibli](https://www.blibli.com/jual/ch7340?utm_source=chatgpt.com "Daftar Harga Ch7340 🔥 Original & Spesifikasi Lengkap Oktober 2025")); Sabira Rp57.500 (clone) ([Sabira Ads](https://sabira.id/ad/arduino-uno-r3-ch340-clone-kabel/?utm_source=chatgpt.com "Arduino Uno R3 CH340 Clone + Kabel - Sabira"))                                                                                                                     |
-| **Modul LoRa** (pilihan):                          |                       |                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| — Ai-Thinker **RA-02** (433 MHz)                   |           **±72.571** | Lazada ([Lazada Indonesia](https://www.lazada.co.id/products/lora-sx1278-ra02-433mhz-long-range-10km-transciever-module-i5724880238.html?utm_source=chatgpt.com "Lora SX1278 RA-02 433Mhz Long Range 10km Transciever Module \| Lazada Indonesia"))                                                                                                                                                                                                              |
-| — **RFM95 / SX1276** (AS923-2/915 MHz, disarankan) |     **94.500–95.000** | Blibli ([Blibli](https://www.blibli.com/jual/lora-modul?utm_source=chatgpt.com "Daftar Harga Lora Modul 🔥 Original & Spesifikasi Lengkap Oktober 2025"))                                                                                                                                                                                                                                                                                                        |
-| DHT21 / AM2301                                     |           **±50.000** | Blibli (SmartCase) ([monotaro.id](https://www.monotaro.id/k/store/Sensor%20Anemometer?utm_source=chatgpt.com "Beli Sensor Anemometer 100% Original \| monotaro.id"))                                                                                                                                                                                                                                                                                             |
-| BMP180                                             |           **±89.000** | Blibli ([Ufuon](https://store.ufuon.com/product/dht21-am2301-temperature-and-humidity-sensor/65a642d800b6e7ecf1e79b6c?utm_source=chatgpt.com "DHT21 AM2301 Temperature and Humidity Sensor"))                                                                                                                                                                                                                                                                    |
-| Sensor hujan **FC-37** (deteksi hujan)             |      **8.500–13.000** | Blibli/Tokopedia ([griyatekno.com](https://www.griyatekno.com/automation-sensor-c-65_133/rain-sensor-p-371.html?utm_source=chatgpt.com "Rain Sensor Module, Home Automation System, Smart Home, Building, Indonesia, Distributor - Rp720.000,00"))                                                                                                                                                                                                               |
-| **Anemometer** (angin) – opsi:                     |                       |                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| — Budget (sensor cup sederhana)                    |          **±165.000** | depoinovasi (Tokopedia) ([depoinovasi.co.id](https://depoinovasi.co.id/sensor-anemometer/?utm_source=chatgpt.com "Sensor Anemometer - Depoinovasi Electronics"))                                                                                                                                                                                                                                                                                                 |
-| — Menengah (0–5 V analog)                          |          **±466.000** | Blibli Achernar ([monotaro.id](https://www.monotaro.id/k/store/Cup%20Anemometer?utm_source=chatgpt.com "Beli Cup Anemometer 100% Original \| monotaro.id"))                                                                                                                                                                                                                                                                                                      |
-| — Pro (DC 5–24 V)                                  |        **±1.221.000** | Blibli Ajs&co ([FlipHTML5](https://fliphtml5.com/wtrlx/xpgu/EL.200_2425.01.033/?utm_source=chatgpt.com "EL.200_2425.01.033 - Carly Nainggolan \| PDF Online \| FlipHTML5"))                                                                                                                                                                                                                                                                                      |
-| LDR / modul LDR                                    |       **1.500–8.000** | Blibli ([Blibli](https://www.blibli.com/jual/ldr-sensor-cahaya?utm_source=chatgpt.com "Jual Ldr Sensor Cahaya 💯 Harga Murah & Kualitas Terbaik Oktober 2025"))                                                                                                                                                                                                                                                                                                  |
-| Buck converter **LM2596**                          |     **10.000–35.000** | Blibli/Ichibot ([Blibli](https://www.blibli.com/jual/stepdown-module-lm2596?utm_source=chatgpt.com "Jual Stepdown Module Lm2596 💯 Harga Murah & Kualitas Terbaik Oktober 2025"))                                                                                                                                                                                                                                                                                |
-| **Enclosure IP65** (ABS/metal)                     |   **59.000–329.900+** | Lazada ABS IP65 Rp59k ([Lazada](https://h5.lazada.co.id/products/box-panel-listrik-ip65-waterproof-outdoor-abs-kotak-panel-listrik-box-terminal-i7905294824.html?utm_source=chatgpt.com "Box Panel Listrik IP65 Waterproof Outdoor ABS Kotak Panel Listrik Box Terminal \| Lazada Indonesia")); Monotaro IP65 metal Rp329.900+ ([monotaro.id](https://www.monotaro.id/k/store/panel%20box?utm_source=chatgpt.com "Beli panel box 100% Original \| monotaro.id")) |
-| Baterai **18650 3000 mAh** (per sel)               |    **35.000–100.000** | Blibli (VTC6 & lain-lain) ([Blibli](https://www.blibli.com/jual/18650-3000-mah?utm_source=chatgpt.com "18650 3000 Mah Gratis Ongkir 🏷️ Harga Murah Oktober 2025"))                                                                                                                                                                                                                                                                                              |
-| Antena LoRa **915 MHz** 3–5 dBi (untuk AS923)      |    **91.800–121.900** | Digiwarestore ([digiwarestore.com](https://digiwarestore.com/id/lora-lorawan/lora-antenna/?utm_source=chatgpt.com "LoRa Antenna - Digiware Store"))                                                                                                                                                                                                                                                                                                              |
-| Kabel, PCB, konektor, ring logam                   |    **~35.000–50.000** | (estimasi pasar lokal)                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-
-**Contoh total per node**
-
-- **Konfigurasi hemat (AS923 disarankan)**: UNO (80k) + RFM95 (95k) + DHT21 (50k) + BMP180 (89k) + FC-37 (8.5k) + Anemo budget (165k) + LDR (1.5k) + LM2596 (12k) + Enclosure ABS (59k) + kecil2 (35k) + 1×18650 (50k) + antena 915 MHz 3 dBi (91.8k) ≈ **Rp714.000**.
-    
-- **Konfigurasi tangguh outdoor**: enclosure IP65 metal, anemo menengah, 2×18650, antena fiberglass 7 dBi (opsi). Dengan pilihan mid di atas + enclosure IP65 (329.9k) + anemo 466k + baterai ekstra + antena 7 dBi (jika dipasang di gateway saja) total **≈ Rp1,40–1,60 juta** per node. (Perhitungan berbasis penjumlahan item ber-sumber di tabel di atas.)
-    
+| Komponen | Estimasi Harga (IDR) | Catatan |
+| :--- | :--- | :--- |
+| Arduino Nano V3 (Type-C/Mini USB) | 45.000 - 60.000 | Clone CH340 umum digunakan |
+| LoRa SX1278 RA-02 (433MHz) | 65.000 - 80.000 | Jangkauan jauh |
+| AHT20 + BMP280 Module | 35.000 - 50.000 | Sering dijual dalam satu modul combo |
+| Anemometer (Analog Voltage) | 150.000 - 450.000 | Varian budget (plastik) |
+| Rain Sensor (FC-37) | 10.000 | Deteksi hujan simpel |
+| LDR Module | 5.000 | Intensitas cahaya |
+| Baterai 18650 x2 + Holder | 50.000 | Power supply |
+| Box X6 / IP65 Enclosure | 25.000 - 50.000 | Pelindung cuaca |
+| **Total Estimasi** | **~Rp 400.000 - 700.000** | Tergantung kualitas enclosure & sensor angin |
 
 ### 5.2 **Gateway** (1 unit)
 
-|Komponen|Estimasi|Sumber|
-|---|--:|---|
-|ESP32 DevKit|**74.000–133.200**|Blibli/Lazada/mbizmarket ([Blibli](https://www.blibli.com/jual/arduino-dip?utm_source=chatgpt.com "Arduino Dip Garansi Resmi Indonesia 🏷️ Harga Murah Oktober 2025"))|
-|Modul LoRa (AS923, disarankan)|**94.500–95.000**|Blibli (RFM95) ([Blibli](https://www.blibli.com/jual/lora-modul?utm_source=chatgpt.com "Daftar Harga Lora Modul 🔥 Original & Spesifikasi Lengkap Oktober 2025"))|
-|Antena LoRa outdoor **7 dBi fiberglass** (opsional, jangkauan)|**±1.403.000**|Digiwarestore ([digiwarestore.com](https://digiwarestore.com/id/lora-lorawan/lora-antenna/?utm_source=chatgpt.com "LoRa Antenna - Digiware Store"))|
-|Enclosure IP65 (panel box)|**329.900–675.000**|Monotaro/Durabox ([monotaro.id](https://www.monotaro.id/k/store/panel%20box?utm_source=chatgpt.com "Beli panel box 100% Original \| monotaro.id"))|
-|Adaptor 5 V/2 A + kabel|**~50.000**|(estimasi pasar lokal)|
+| Komponen | Estimasi Harga (IDR) | Catatan |
+| :--- | :--- | :--- |
+| ESP32-S3 DevKit | 90.000 - 120.000 | Performa tinggi |
+| LoRa SX1278 RA-02 | 65.000 - 80.000 | |
+| PCB / Breadboard & Kabel | 20.000 | |
+| Adaptor 5V | 25.000 | Power supply |
+| **Total Estimasi** | **~Rp 200.000 - 250.000** | |
 
-**Contoh total**
+## 6) Alur Data (Flow)
 
-- **Gateway hemat** (antena kecil 3–5 dBi, enclosure ABS): **≈ Rp350–450 ribu**.
-    
-- **Gateway outdoor** (antena fiberglass 7 dBi, panel box IP65): **≈ Rp1,9–2,1 juta**.
-    
+1.  **Transmitter** membaca sensor setiap 10 detik (atau interval yang diatur).
+2.  Data dikemas dalam `struct` C++ dan dihitung CRC8-nya.
+3.  Paket dikirim via LoRa (433MHz).
+4.  **Gateway** menerima paket, hitung ulang CRC8. Jika cocok:
+    *   Ambil konfigurasi stasiun (Nama, Lokasi) dari Registry internal.
+    *   Ambil waktu sekarang dari NTP Server.
+    *   Format JSON sesuai standar.
+5.  Gateway publish JSON ke MQTT Broker (Topik: `weather/station/data`).
+6.  **Subscriber** (App/DB) menerima data real-time.
 
-### 5.3 **Tenaga surya (opsional, per titik)**
+## 7) Praktik Terbaik yang Diterapkan
 
-|Item|Estimasi|Sumber|
-|---|--:|---|
-|**Panel surya 20 Wp**|**Rp275.000–370.000**|Blibli / PanelSuryaJakarta (harga 20 Wp) ([Blibli](https://www.blibli.com/jual/surya-20-wp?utm_source=chatgpt.com "Jual Surya 20 Wp 💯 Harga Murah & Kualitas Terbaik Oktober 2025"))|
-|**Solar charge controller PWM 10 A**|**Rp65.000–138.000**|Lazada/Dinomarket ([Lazada Indonesia](https://www.lazada.co.id/products/solar-charge-controller-pwm-10a--20a--30a-lithium-12v--24v-i7216040421.html?utm_source=chatgpt.com "Solar Charge Controller PWM 10A / 20A / 30A Lithium 12V / 24V \| Lazada Indonesia"))|
-|Aki 12 V 7 Ah (opsional, paket)|(paket 20 Wp+SCC+aki ± **Rp790.000**)|Lazada paket 20 Wp ([Lazada Indonesia](https://www.lazada.co.id/products/paket-solar-panel-surya-20wp-solar-controller-10a-aki-12v-7ah--sollare-i8675084974.html?utm_source=chatgpt.com "PAKET SOLAR PANEL SURYA 20WP, SOLAR CONTROLLER 10A, AKI 12V 7AH - sollare \| Lazada Indonesia"))|
-
-### 5.4 **Server & Domain (bulanan)**
-
-|Komponen|Estimasi|Sumber|
-|---|--:|---|
-|**VPS Indonesia ~2 vCPU/2 GB**|**Rp149.000–180.000 / bulan**|IDCloudHost, Cloudmatika ([IDCloudHost](https://idcloudhost.com/en/cloud-vps/?utm_source=chatgpt.com "Cloud VPS Indonesia - Auto Scale Up & Murah \| IDCloudhost"))|
-|**Domain .my.id**|**Rp30.000–50.000 / tahun** (promo sering ada)|BuyCloud, info PANDI 2024/25 ([BuyCloud](https://www.buycloud.id/domain/name/my.id?utm_source=chatgpt.com "Murah! Promo Domain MY.ID Oktober 2025 Rp 30,000"))|
-
-**Contoh TCO awal** (tanpa tenaga surya):
-
-- **5 node (hemat) + 1 gateway hemat + 1 bulan VPS + domain** ≈ **Rp4,1 juta**.
-    
-- **5 node (outdoor) + 1 gateway outdoor + 1 bulan VPS + domain** ≈ **Rp9,1 juta**.  
-    (Angka dibulatkan dari penjumlahan item-item pada tabel sumber di atas.)
-    
-
-## 6) Alur data & API (tanpa kode)
-
-1. **Node** sampling (mis. tiap 1–5 menit) → paket **LoRa** (timestamp, id, nilai sensor).
-    
-2. **Gateway ESP32** decode & kirim **HTTP POST** ke **FastAPI** (payload JSON + API-key perangkat).
-    
-3. **FastAPI** validasi → tulis ke **MySQL** (tabel readings, stations, sensors).
-    
-4. **Servis Prediksi** tarik data histori → **Random Forest** → simpan output (tabel forecasts).
-    
-5. **Flutter app** memanggil endpoint `/realtime`, `/history`, `/predict`.
-    
-
-## 7) Non-fungsional & praktik terbaik
-
-- **Kepatuhan frekuensi**: gunakan **AS923-2 (921.4–922.0 MHz, dsb.)** sesuai praktik Indonesia; rujukan LoRa Alliance & Helium/Antares. ([read.uberflip.com](https://read.uberflip.com/i/1540208/81?utm_source=chatgpt.com "Document - RP002-1.0.5 LoRaWAN Regional Parameters"))
-    
-- **Keandalan**: retry di gateway, queue ringan (mis. buffer RAM/flash), **watchdog**.
-    
-- **Monitoring**: metrik ingest (RPS, latency), packet loss LoRa, status node.
-    
-- **Skala**: multi-gateway (overlap coverage), **sharding** DB per lokasi, cache baca (Redis).
-    
-- **Keamanan**: TLS, JWT, rotasi key, rate-limit, firewall VPS.
-    
-- **Kalibrasi**: anemometer & hujan → tabel faktor kalibrasi; verifikasi lapangan berkala.
-    
-- **Backup**: dump MySQL harian; retensi 30–90 hari.
-    
-
----
-
-**Catatan akhir**
-
-- Arsitektur di atas **mengikuti struktur artikel (LoRa→ESP32→FastAPI/MySQL→Flutter→RF)** dan disesuaikan untuk pasar Indonesia (band **AS923-2** & harga komponen lokal).
-    
-- Jika Anda ingin, saya bisa turunkan ke **arsitektur fisik rinci** (layout PCB, wiring pin, daftar endpoint REST, skema tabel MySQL) **tanpa kode** dalam iterasi berikut.
+-   **Data Integrity**: Penggunaan CRC8 mencegah data korup (noise) terproses.
+-   **Interoperabilitas**: Format JSON Schema.org memungkinkan data mudah dikonsumsi sistem lain.
+-   **Skalabilitas**: Arsitektur MQTT memungkinkan banyak subscriber tanpa membebani gateway.
+-   **Reliabilitas**: Gateway otomatis reconnect WiFi/MQTT jika putus.

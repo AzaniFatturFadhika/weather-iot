@@ -18,19 +18,18 @@ Dalam pemodelan, kualitas input menentukan kualitas output. Analogi yang tepat a
 
 ### 1.2. Komponen Pengumpul Data
 
-Untuk memastikan data yang dikumpulkan akurat dan andal, sistem ini menggunakan strategi **redundansi sensor**, di mana beberapa sensor mengukur parameter yang sama. Berikut adalah komponen utama yang digunakan:
+Untuk memastikan data yang dikumpulkan akurat dan andal, sistem ini menggunakan sensor presisi tinggi yang memenuhi standar industri. Berikut adalah komponen utama yang digunakan:
 
 |   |   |   |
 |---|---|---|
 |Jenis Sensor|Fungsi Utama|Data yang Diukur|
-|**DHT22**|Mengukur suhu dan kelembapan udara.|Suhu (°C), Kelembapan (%)|
-|**BMP280**|Mengukur tekanan atmosfer dan suhu.|Tekanan Udara (HPa), Suhu (°C)|
-|**AHT20**|Sensor redundan untuk suhu dan kelembapan.|Suhu (°C), Kelembapan (%)|
-|**Anemometer**|Mengukur kecepatan pergerakan udara.|Kecepatan Angin (m/s)|
+|**AHT20**|Mengukur suhu dan kelembapan udara dengan presisi tinggi (I2C).|Suhu (°C), Kelembapan (%)|
+|**BMP280**|Mengukur tekanan atmosfer dan suhu (I2C).|Tekanan Udara (HPa), Suhu (°C)|
+|**Anemometer**|Mengukur kecepatan pergerakan udara (Analog).|Kecepatan Angin (m/s)|
 |**Rain Sensor**|Mendeteksi ada atau tidaknya curah hujan.|Status Hujan (Ya/Tidak)|
 |**LDR (Photoresistor)**|Mengukur tingkat cahaya di lingkungan sekitar.|Intensitas Cahaya|
 
-Setelah semua data ditangkap, sebuah mikrokontroler **Arduino Nano** bertindak sebagai "otak kecil" di lapangan. Perangkat ini mengumpulkan semua informasi dari berbagai sensor dan melakukan **"fusi data ringan"** (light data fusion) di tingkat firmware, misalnya dengan merata-ratakan pembacaan dari sensor suhu yang berbeda. Proses ini meningkatkan presisi dan keandalan data sebelum dikirim, memastikan hanya "bahan baku" berkualitas tinggi yang diteruskan ke sistem.
+Setelah semua data ditangkap, sebuah mikrokontroler **Arduino Nano** bertindak sebagai "otak kecil" di lapangan. Perangkat ini mengumpulkan semua informasi dari berbagai sensor, melakukan validasi awal, dan mengemas data tersebut.
 
 --------------------------------------------------------------------------------
 
@@ -46,16 +45,14 @@ Sistem prakiraan cuaca modern harus andal, bahkan di lokasi yang tidak memiliki 
 
 ### 2.2. Teknologi LoRa sebagai Solusi
 
-Untuk pengiriman data jarak jauh, sistem ini memanfaatkan teknologi **LoRa (Long Range)**. Anggap saja LoRa seperti **"walkie-talkie canggih"** untuk data. Teknologi ini mampu mengirimkan paket-paket data kecil dalam jarak yang sangat jauh (beberapa kilometer) dengan konsumsi daya yang sangat rendah. Ini menjadikannya solusi ideal untuk perangkat IoT bertenaga baterai yang ditempatkan di lokasi terpencil. Sistem ini secara spesifik menggunakan modul LoRa RA-02 untuk melakukan tugas ini.
-
-Meskipun modul 433 MHz digunakan dalam prototipe ini karena efektivitas biaya dan jangkauannya untuk komunikasi _point-to-point_, penting untuk dicatat konteks lokal. Untuk penerapan yang dapat diskalakan dan sesuai regulasi di Indonesia, frekuensi yang direkomendasikan untuk jaringan LoRaWAN adalah **AS923-2** (sekitar 920-923 MHz). Pemilihan frekuensi yang tepat memastikan sistem dapat berkembang di masa depan tanpa menimbulkan interferensi.
+Untuk pengiriman data jarak jauh, sistem ini memanfaatkan teknologi **LoRa (Long Range)**. Anggap saja LoRa seperti **"walkie-talkie canggih"** untuk data. Teknologi ini mampu mengirimkan paket-paket data kecil dalam jarak yang sangat jauh (beberapa kilometer) dengan konsumsi daya yang sangat rendah. Ini menjadikannya solusi ideal untuk perangkat IoT bertenaga baterai yang ditempatkan di lokasi terpencil. Sistem ini secara spesifik menggunakan modul LoRa SX1278 (433MHz) untuk melakukan tugas ini.
 
 ### 2.3. Alur Pengiriman Data
 
 Proses pengiriman data dari sensor ke server dapat diuraikan dalam alur sederhana berikut:
 
-1. **Pengirim (Transmitter):** Mikrokontroler **Arduino Nano** yang terhubung dengan sensor-sensor mengemas data cuaca yang telah divalidasi dan mengirimkannya melalui modul LoRa.
-2. **Penerima (Gateway):** Di lokasi lain yang memiliki akses internet, sebuah modul LoRa yang terhubung ke mikrokontroler **ESP32-S3** menerima paket data tersebut. ESP32-S3, yang memiliki daya pemrosesan lebih tinggi, berfungsi sebagai **"jembatan"** antara jaringan LoRa dan internet, yang akan meneruskan data ke server pusat melalui koneksi Wi-Fi.
+1. **Pengirim (Transmitter):** Mikrokontroler **Arduino Nano** yang terhubung dengan sensor-sensor mengemas data cuaca yang telah divalidasi dan mengirimkannya melalui modul LoRa. Data dilengkapi dengan **CRC8 Checksum** untuk memastikan integritasnya.
+2. **Penerima (Gateway):** Di lokasi lain yang memiliki akses internet, sebuah modul LoRa yang terhubung ke mikrokontroler **ESP32-S3** menerima paket data tersebut. ESP32-S3 memvalidasi checksum, menambahkan informasi waktu (NTP) dan lokasi, lalu mengubahnya menjadi format standar.
 
 --------------------------------------------------------------------------------
 
@@ -63,19 +60,19 @@ Kini, data mentah telah berhasil melintasi jarak dan tiba di gerbang digital. La
 
 ## 3. Tahap 3: Penyimpanan dan Pengelolaan - 'Perpustakaan' Digital Cuaca
 
-Setelah data berhasil melintasi jarak jauh, data tersebut perlu disimpan dalam sebuah sistem yang terstruktur agar dapat dianalisis. Di sinilah peran backend dan database menjadi krusial.
+Setelah data berhasil melintasi jarak jauh, data tersebut perlu didistribusikan dan disimpan. Di sinilah peran protokol **MQTT** dan database menjadi krusial.
 
-### 3.1. Dari Gateway ke Server
+### 3.1. Dari Gateway ke Server via MQTT
 
-Untuk mengirim data dari gateway ESP32-S3 ke server, sistem menggunakan **API (Application Programming Interface)**. Anda bisa membayangkan API sebagai **"pelayan di restoran"**. ESP32-S3 (pelanggan) membuat "pesanan" yang berisi data cuaca. Pesanan ini kemudian diterima oleh API (pelayan) yang disediakan oleh backend (dapur), yang dalam kasus ini menggunakan kerangka kerja **FastAPI**. Backend kemudian memproses pesanan tersebut dan menyimpannya di tempat yang tepat. Sistem ini memiliki 9 API yang dibuat untuk berbagai layanan, termasuk pendaftaran dan otentikasi pengguna, memasukkan data sensor, mengambil data untuk grafik, serta menyediakan data prediksi.
+Untuk mengirim data dari gateway ESP32-S3 ke server, sistem menggunakan protokol **MQTT (Message Queuing Telemetry Transport)**. Anda bisa membayangkan MQTT sebagai **"papan pengumuman digital"**. Gateway (Publisher) menempelkan data cuaca terbaru di papan pengumuman dengan topik tertentu (misalnya `weather/station/data`). Pihak yang berkepentingan, seperti server backend atau aplikasi mobile (Subscriber), akan langsung menerima salinan data tersebut begitu ditempelkan. Ini jauh lebih efisien dan cepat dibandingkan metode pemesanan satu per satu.
 
 ### 3.2. Database: Jantung Penyimpanan Data
 
-Semua data yang masuk disimpan dalam database **MySQL**, yang berfungsi seperti **"perpustakaan digital raksasa"**. Perpustakaan ini menyimpan tiga jenis data utama secara terstruktur:
+Semua data yang masuk disimpan dalam database **MySQL** atau **PostgreSQL**, yang berfungsi seperti **"perpustakaan digital raksasa"**. Perpustakaan ini menyimpan tiga jenis data utama secara terstruktur:
 
 - **Data Sensor Real-Time:** Berisi catatan cuaca terbaru yang dikirimkan secara terus-menerus dari perangkat IoT di lapangan.
-- **Data Historis:** Merupakan arsip data cuaca yang sangat besar, dikumpulkan dari sumber eksternal seperti `www.visualcrossing.com`, yang mencakup periode dari tahun 2000 hingga 2024. Data ini krusial untuk melatih model Machine Learning.
-- **Informasi Pengguna:** Menyimpan data yang diperlukan untuk mengelola akun pengguna yang mengakses aplikasi, seperti informasi login dan registrasi.
+- **Data Historis:** Merupakan arsip data cuaca yang sangat besar.
+- **Informasi Pengguna:** Menyimpan data yang diperlukan untuk mengelola akun pengguna.
 
 Untuk pengembangan sistem di masa depan, terutama dalam konteks Indonesia, integrasi dengan sumber data lokal seperti API publik dari **BMKG (Badan Meteorologi, Klimatologi, dan Geofisika)** dapat semakin meningkatkan relevansi dan akurasi model untuk kondisi cuaca nusantara.
 

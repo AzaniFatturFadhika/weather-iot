@@ -27,7 +27,7 @@ Understand how everything works together.
 | [Multi-Transmitter System](architecture/multi-transmitter.md) | Station registry & scalability |
 | [Data Format Standard](architecture/data-format.md) | Industry standards & compliance |
 | [Production Deployment](architecture/production-deployment.md) | Real-world implementation |
-| [System Overview](architecture/system-overview.md) | **NEW** - High-level architecture |
+| [Architecture Design](architecture/ARCHITECTURE_DESIGN.md) | **NEW** - High-level architecture |
 
 ---
 
@@ -49,7 +49,7 @@ Hardware specifications and assembly.
 |----------|-------------|
 | [Pin Reference](hardware/pin-reference.md) | ESP32 & Arduino pin connections |
 | [Parts List](hardware/parts-list.md) | **NEW** - Complete BOM |
-| [Assembly Guide](hardware/assembly-guide.md) | **NEW** - Step-by-step build |
+| [Assembly Guide](hardware/assembly-guide.md) | **PENDING** - Step-by-step build |
 
 ---
 
@@ -60,7 +60,7 @@ Resources for developers working on the codebase.
 |----------|-------------|
 | [MQTT Library Comparison](development/mqtt-library-comparison.md) | Library selection rationale |
 | [Contributing Guide](development/contributing.md) | **NEW** - How to contribute |
-| [Testing Guide](development/testing.md) | **NEW** - Testing procedures |
+| [Testing Guide](development/testing.md) | **PENDING** - Testing procedures |
 
 ---
 
@@ -109,11 +109,11 @@ Track changes across versions.
 
 | Category | Files | Status |
 |----------|-------|--------|
-| Guides | 5 | ⚠️ 3 pending |
-| Architecture | 4 | ⚠️ 1 pending |
-| API | 3 | ⚠️ 3 pending |
-| Hardware | 3 | ⚠️ 2 pending |
-| Development | 3 | ⚠️ 2 pending |
+| Guides | 5 | ✅ Complete |
+| Architecture | 4 | ✅ Complete |
+| API | 3 | ✅ Complete |
+| Hardware | 3 | ⚠️ 1 pending (Assembly Guide) |
+| Development | 3 | ⚠️ 1 pending (Testing Guide) |
 | Changelog | 3 | ✅ Complete |
 
 **Legend:** ✅ Complete | ⚠️ In Progress | ❌ Not Started
@@ -128,4 +128,4 @@ Track changes across versions.
 
 ---
 
-**Last Updated:** 2025-11-23
+**Last Updated:** 2025-11-27
