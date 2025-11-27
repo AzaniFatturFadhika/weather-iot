@@ -1,0 +1,49 @@
+# Arduino/ESP32
+.pio
+.vscode
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Build files
+*.o
+*.a
+*.elf
+*.hex
+*.bin
+
+# IDE
+.idea/
+*.iml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# Node
+node_modules/
+npm-debug.log
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Secrets (DO NOT COMMIT!)
+*secret*
+*password*
+*.key
+*.pem
+credentials.json
+
+# Backup files
+*.bak
+*.backup
+*_old
+*_backup

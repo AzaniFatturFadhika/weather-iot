@@ -1,0 +1,29 @@
+# Mosquitto Configuration Example
+
+# Listener
+listener 1883 0.0.0.0
+
+# Anonymous access (for testing only!)
+allow_anonymous true
+
+# For production, use authentication:
+# allow_anonymous false
+# password_file /etc/mosquitto/passwd
+
+# Logging
+log_dest file /var/log/mosquitto/mosquitto.log
+log_type all
+
+# Persistence
+persistence true
+persistence_location /var/lib/mosquitto/
+
+# Auto-save interval
+autosave_interval 1800
+
+# QoS settings
+max_queued_messages 1000
+message_size_limit 0
+
+# Connection limits
+max_connections -1
