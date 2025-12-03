@@ -1,0 +1,34 @@
+# .gitignore for model_training directory
+
+# Trained Models (large files)
+models/*.pkl
+models/*_pkl
+
+# Output images (can be regenerated)
+outputs/*.png
+outputs/*.jpg
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Exported data (can be regenerated)
+*.csv
+*.json
+
+# Temporary files
+*.tmp
+*.bak

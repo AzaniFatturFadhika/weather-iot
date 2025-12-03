@@ -11,11 +11,14 @@ Get started and learn how to use the system.
 
 | Guide | Description |
 |-------|-------------|
-| [Getting Started](guides/getting-started.md) | **NEW** - Complete setup from scratch |
+| [Getting Started](guides/getting-started.md) | **NEW** - Complete setup from scratch (includes gateway selection) |
 | [Quick Start](guides/quick-start.md) | **NEW** - TL;DR version for experienced users |
 | [Adding Transmitter](guides/adding-transmitter.md) | How to add new weather station |
 | [Mosquitto Setup](guides/mosquitto-setup.md) | MQTT broker installation (WSL) |
 | [Troubleshooting](guides/troubleshooting.md) | **NEW** - Common problems & solutions |
+
+> [!NOTE]
+> All guides now cover both **MQTT Gateway (recommended)** and **HTTP Gateway (legacy)** versions.
 
 ---
 
@@ -36,7 +39,8 @@ Technical specs for developers.
 
 | Document | Description |
 |----------|-------------|
-| [JSON Schema](api/json-schema.md) | **NEW** - Complete JSON format reference |
+| [JSON Schema](api/json-schema.md) | **NEW** - Complete JSON format reference (MQTT Gateway) |
+| [HTTP Gateway API](api/http-gateway.md) | **NEW** - HTTP Gateway data format & backend implementation |
 | [MQTT Topics](api/mqtt-topics.md) | **NEW** - Topic structure & usage |
 | [LoRa Payload](api/lora-payload.md) | **NEW** - Transmitter payload format |
 

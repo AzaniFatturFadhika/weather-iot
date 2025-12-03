@@ -8,11 +8,12 @@
 
 ## 🌟 Features
 
-- ✅ **Industry Standard Compliant** - Schema.org WeatherObservation + UN/CEFACT unit codes
-- ✅ **Multi-Transmitter Support** - Station registry untuk puluhan stasiun
+- ✅ **Industry Standard Compliant** - Schema.org WeatherObservation + UN/CEFACT unit codes (MQTT Gateway)
+- ✅ **Multi-Transmitter Support** - Station registry untuk puluhan stasiun (MQTT Gateway)
+- ✅ **Dual Gateway Options** - MQTT (recommended) atau HTTP (legacy)
 - ✅ **Data Integrity** - CRC8 checksum untuk validasi packet
-- ✅ **Real-time Monitoring** -Data setiap 10 detik via LoRa + MQTT
-- ✅ **Production Ready** - NTP sync, data validation, error handling
+- ✅ **Real-time Monitoring** - Data setiap 10 detik via LoRa
+- ✅ **Production Ready** - NTP sync, data validation, error handling (MQTT Gateway)
 
 ---
 
@@ -29,6 +30,21 @@
 
 ---
 
+## 🔀 Gateway Version Selection
+
+Pilih versi gateway sesuai kebutuhan:
+
+| Version | Use Case | Recommended For |
+|---------|----------|----------------|
+| **MQTT Gateway** ✅ | Modern IoT platform | ✅ **Recommended** - New projects, industry compliance |
+| **HTTP Gateway** | Legacy backend compatibility | Existing systems with HTTP API |
+
+**Quick Decision:**
+- 🆕 **New project?** → Use **gateway_mqtt** (Schema.org compliant, multi-station support)
+- 🔧 **Existing HTTP backend?** → Use **gateway_http** (compatible with `/weather-data/create` endpoint)
+
+---
+
 ## 🚀 Quick Start
 
 ### 1. Hardware Setup
@@ -40,12 +56,18 @@ Gateway: ESP32-S3 + LoRa SX1278
 
 ### 2. Upload Firmware
 
+**Transmitter (same for both gateway versions):**
 ```bash
-# Transmitter (Arduino IDE)
 firmware/transmitter/transmitter.ino
+```
 
-# Gateway (Arduino IDE)
-firmware/gateway/gateway.ino
+**Gateway (choose one):**
+```bash
+# Option A: MQTT Gateway (Recommended)
+firmware/gateway/gateway_mqtt/gateway_mqtt.ino
+
+# Option B: HTTP Gateway (Legacy)
+firmware/gateway/gateway_http/gateway_http.ino
 ```
 
 ### 3. Configure
@@ -54,17 +76,25 @@ firmware/gateway/gateway.ino
 // Transmitter: Set unique ID
 const String DEVICE_ID = "TX001";
 
-// Gateway: Set WiFi & MQTT
+// Gateway MQTT: Set WiFi & MQTT
 const char* WIFI_SSID = "your-wifi";
 const char* MQTT_HOST = "broker.emqx.io";
+
+// Gateway HTTP: Set WiFi & Backend URL
+const char* WIFI_SSID = "your-wifi";
+const char* BACKEND_URL = "http://192.168.1.100:8000";
 ```
 
 ### 4. Monitor Data
 
+**MQTT Gateway:**
 ```bash
 mosquitto_sub -h broker.emqx.io -p 1883 -u emqx -P public \
   -t "weather/station/data" -v
 ```
+
+**HTTP Gateway:**
+Check your backend server logs or database for incoming data.
 
 **[📖 Full Setup Guide →](docs/guides/getting-started.md)**
 
@@ -76,7 +106,9 @@ mosquitto_sub -h broker.emqx.io -p 1883 -u emqx -P public \
 weather-iot/
 ├── firmware/             # Source code (Arduino sketches)
 │   ├── transmitter/       # ✅ Current (industry compliant)
-│   └── gateway/           # ✅ Current (industry compliant)
+│   └── gateway/           # Gateway implementations
+│       ├── gateway_mqtt/  # ✅ Recommended (Schema.org, multi-station)
+│       └── gateway_http/  # Legacy (HTTP GET to backend)
 ├── docs/                 # Documentation
 │   ├── guides/            # User guides & tutorials
 │   ├── architecture/      # System design & architecture
@@ -108,6 +140,9 @@ weather-iot/
   • Raindrop                    • Format normalization         • Analytics
   • LDR                         • Station registry
 ```
+
+> [!NOTE]
+> Diagram di atas menunjukkan **MQTT Gateway** (recommended). Untuk **HTTP Gateway**, data dikirim langsung ke backend via HTTP GET tanpa MQTT broker.
 
 **[🏗️ Detailed Architecture →](docs/architecture/multi-transmitter.md)**
 
@@ -161,6 +196,9 @@ weather-iot/
 }
 ```
 
+> [!NOTE]
+> Format JSON di atas adalah untuk **MQTT Gateway**. **HTTP Gateway** mengirim data sebagai query parameters: `temp=28.50&humidity=65.20&pressure=1013.25...`
+
 **[📖 Complete JSON Schema →](docs/api/json-schema.md)**
 
 ---
@@ -178,6 +216,9 @@ StationConfig stationRegistry[] = {
 };
 ```
 
+> [!IMPORTANT]
+> Multi-transmitter dengan station registry hanya tersedia di **MQTT Gateway**. **HTTP Gateway** hanya support single transmitter.
+
 **[📖 Adding New Transmitter Guide →](docs/guides/adding-transmitter.md)**
 
 ---
@@ -191,6 +232,7 @@ StationConfig stationRegistry[] = {
 - ✅ UN/CEFACT unit codes (CEL, P1, HPA, KMH)
 - ✅ Multi-station registry system
 - ✅ NTP time synchronization
+- ✅ Dual gateway support (MQTT + HTTP)
 
 ### v1.0.0 (2025-11-22) - Initial Release
 

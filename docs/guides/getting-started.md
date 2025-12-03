@@ -131,9 +131,34 @@ Install libraries berikut:
 
 ---
 
-## 📝 Step 3: Configure & Upload Firmware
+## 🔀 Step 3: Choose Gateway Version
 
-### 3.1 Transmitter Configuration
+**Pilih versi gateway yang sesuai dengan kebutuhan:**
+
+### Option A: MQTT Gateway ✅ Recommended
+
+**Use this if:**
+- You're starting a new project
+- You want industry-standard compliance (Schema.org)
+- You need multi-station support
+- You plan to integrate with IoT platforms
+
+**Firmware:** `firmware/gateway/gateway_mqtt/gateway_mqtt.ino`
+
+### Option B: HTTP Gateway (Legacy)
+
+**Use this if:**
+- You have an existing HTTP backend
+- Your backend has `/weather-data/create` endpoint
+- You prefer simple HTTP GET requests
+
+**Firmware:** `firmware/gateway/gateway_http/gateway_http.ino`
+
+---
+
+## 📝 Step 4: Configure & Upload Firmware
+
+### 4.1 Transmitter Configuration
 
 1. Open `firmware/transmitter/transmitter.ino`
 
@@ -158,9 +183,11 @@ Install libraries berikut:
    BMP280 initialized!
    ```
 
-### 3.2 Gateway Configuration
+### 4.2 Gateway Configuration - MQTT Version ✅
 
-1. Open `firmware/gateway/gateway.ino`
+**Skip this if using HTTP version (see section 4.3 below)**
+
+1. Open `firmware/gateway/gateway_mqtt/gateway_mqtt.ino`
 
 2. Configure WiFi:
    ```cpp
@@ -168,7 +195,7 @@ Install libraries berikut:
    const char* WIFI_PASSWORD = "YourWiFiPassword";
    ```
 
-3. Configure MQTT (gunakan broker.emqx.io untuk testing):
+3. Configure MQTT (use broker.emqx.io for testing):
    ```cpp
    const char* MQTT_HOST = "broker.emqx.io";
    const int MQTT_PORT = 1883;
@@ -207,9 +234,44 @@ Install libraries berikut:
    ✓ Gateway ready!
    ```
 
+### 4.3 Gateway Configuration - HTTP Version (Legacy)
+
+**Skip this if using MQTT version (section 4.2 above)**
+
+1. Open `firmware/gateway/gateway_http/gateway_http.ino`
+
+2. Configure WiFi:
+   ```cpp
+   const char* WIFI_SSID = "YourWiFiName";
+   const char* WIFI_PASSWORD = "YourWiFiPassword";
+   ```
+
+3. Configure Backend URL:
+   ```cpp
+   const char* BACKEND_URL = "http://192.168.1.100:8000";
+   ```
+
+4. Select Board:
+   - Tools → Board → ESP32 Arduino → ESP32S3 Dev Module
+
+5. Select Port: Tools → Port → (your ESP32 port)
+
+6. Upload: Click Upload
+
+7. Open Serial Monitor (115200 baud):
+   ```
+   ===== Weather Gateway (HTTP Legacy) Starting =====
+   ✓ LoRa initialized!
+   Connecting to WiFi: YourWiFiName
+   ✓ WiFi connected!
+   ✓ Gateway ready!
+   ```
+
 ---
 
-## 🔌 Step 4: Setup MQTT Broker (Optional)
+## 🔌 Step 5: Setup MQTT Broker (MQTT Gateway Only)
+
+**Skip this section if using HTTP Gateway**
 
 **Untuk Testing:** Gunakan public broker `broker.emqx.io` (sudah configured di atas)
 
@@ -219,9 +281,9 @@ Install libraries berikut:
 
 ---
 
-## 📡 Step 5: Verify Data Flow
+## 📡 Step 6: Verify Data Flow
 
-### 5.1 Subscribe to MQTT Topic
+### 6.1 For MQTT Gateway
 
 ```bash
 # Install mosquitto clients (if not installed)
