@@ -1,8 +1,4 @@
-Berikut adalah kerangka urutan/struktur _notebook_ `ipynb` untuk melakukan _training_ _dataset_, evaluasi model, dan visualisasi hasil, merujuk pada metodologi dan temuan yang dijelaskan dalam dokumen:
-
-[1-s2.0-S2590005625001018-main-indo.pdf](....\docs\reference\1-s2.0-S2590005625001018-main-indo.pdf)
-
-Berikut adalah visualisasi yang ditampilkan dalam jurnal artikel terkait data _training_ dan perbandingan hasil model, serta kecocokannya dengan kerangka _notebook_ yang Anda rancang:
+Berikut adalah kerangka urutan/struktur _notebook_ `ipynb` untuk melakukan _training_ _dataset_, evaluasi model, dan visualisasi hasil, yang telah diperbarui untuk mendukung metodologi **Time-Series Forecasting** yang lebih akurat:
 
 ### Visualisasi dalam Jurnal dan Kecocokan dengan Kerangka Notebook
 
@@ -14,76 +10,73 @@ Berikut adalah visualisasi yang ditampilkan dalam jurnal artikel terkait data _t
 | **6. Visualisasi Perbandingan Aktual vs. Prediksi**    | Output perbandingan visual*Actual vs Predicted* untuk semua fitur yang diprediksi Kelembaban.                                | **Gambar 16:** _Actual vs. Predicted humidity_.                         |
 | **6. Visualisasi Perbandingan Aktual vs. Prediksi**    | Output perbandingan visual*Actual vs Predicted* untuk semua fitur yang diprediksi Kecepatan Angin.                           | **Gambar 17:** _Actual vs. Predicted wind speed_.                       |
 | **6. Visualisasi Perbandingan Aktual vs. Prediksi**    | Output perbandingan visual*Actual vs Predicted* untuk semua fitur yang diprediksi Tekanan.                                   | **Gambar 18:** _Actual vs. Predicted pressure_.                         |
-| **6. Visualisasi Perbandingan Aktual vs. Prediksi**    | Output perbandingan visual*Actual vs Predicted* untuk semua fitur yang diprediksi Status Hujan.                              | (BELUM ADA)                                                             |
-| **6. Visualisasi Perbandingan Aktual vs. Prediksi**    | Output perbandingan visual*Actual vs Predicted* untuk semua fitur yang diprediksi Kondisi Cuaca (Berdasarkan weather_code)). | (BELUM ADA)                                                             |
 | **7. Visualisasi Dampak Data Inkremental**             | Grafik garis yang menunjukkan peningkatan skor$R^2$ seiring bertambahnya jumlah _data points_ (_Incremental Learning_).      | **Gambar 21:** _Impact of incremental data on model performance_.       |
 
-**Catatan:** Jurnal tersebut tidak mencantumkan visualisasi eksplisit untuk Pra-pemrosesan Data (seperti distribusi atau korelasi data mentah), tetapi memberikan narasi rinci tentang langkah-langkah _Label Encoding_, _Dropping_ _Null_ _Data_, dan _Filling_ _Null_ _Data_.
-
-## Kerangka Struktur Notebook (`.ipynb`) untuk Pelatihan Model Prediksi Cuaca
+## Kerangka Struktur Notebook (`.ipynb`) untuk Pelatihan Model Prediksi Cuaca (Diperbarui)
 
 ### 1\. Persiapan Lingkungan dan Pemuatan Pustaka
 
-- **Tujuan:** Mengimpor semua pustaka Python yang diperlukan untuk pemrosesan data, pelatihan model, evaluasi, dan visualisasi.
-- **Pustaka Kunci yang Diperlukan:** `pandas`, `numpy`, `matplotlib`, `seaborn`, `sklearn` (termasuk `train_test_split`, `LabelEncoder`, `LinearRegression`, `DecisionTreeRegressor`, `KNeighborsRegressor`, `RandomForestRegressor`, dan metrik), `joblib` (untuk menyimpan model).
+- **Tujuan:** Mengimpor semua pustaka Python yang diperlukan.
+- **Pustaka Kunci:** `pandas`, `numpy`, `matplotlib`, `seaborn`, `sklearn` (termasuk `TimeSeriesSplit`, `RandomForestRegressor`, dll), `joblib`.
 - **Output yang Diharapkan:** Konfirmasi impor pustaka berhasil.
 
-### 2\. Pengumpulan dan Pemuatan Data (Sesuai Bagian 3.1)
+### 2\. Pengumpulan dan Pemuatan Data
 
 - **Tujuan:** Memuat _dataset_ historis gabungan.
 - **Langkah:**
-  - Memuat data historis [historical_data_hourly.csv](..\data_collections\datasets\historical_data_hourly.csv). Dataset sudah menggunakan timezone Asia/Jakarta. Koordinat Lokasi di Kota Semarang.
-  - Memuat data sensor waktu nyata (meskipun hanya data historis yang digunakan untuk pelatihan utama, kerangka kerja harus mencerminkan sumber data).
-- **Output yang Diharapkan:** Tampilan beberapa baris pertama _dataset_ (`df.head()`) dan jumlah total catatan.
+  - Memuat data historis [historical_data_hourly.csv](..\data_collections\datasets\historical_data_hourly.csv).
+  - Mengurutkan data berdasarkan waktu (`timestamp`) untuk memastikan urutan kronologis yang benar.
+- **Output yang Diharapkan:** Tampilan beberapa baris pertama _dataset_ dan info struktur data.
 
-### 3\. Pra-pemrosesan Data (Sesuai Bagian 3.2)
+### 3\. Pra-pemrosesan Data dan Feature Engineering (PENTING)
 
-- **Tujuan:** Membersihkan, menstandarkan, dan mempersiapkan data untuk pelatihan model regresi.
+- **Tujuan:** Menyiapkan fitur yang relevan untuk prediksi deret waktu (_Time-Series_).
 - **Langkah:**
-  - **Memilih Kolom:** Memilih kolom fitur yang akan digunakan.
-  - **Memformat Pola Data:** Menstandarkan format tanggal yang tidak konsisten
-  - **_Label Encoding_**: Mengubah variabel kategori **kondisi cuaca** (_conditions_ dalam format _string_) menjadi nilai numerik, misalnya "0" untuk cerah (_sunny_) dan "1" untuk berawan (_cloudy_), karena model regresi hanya bekerja dengan nilai numerik.
-- **Output yang Diharapkan:** Tampilan _dataset_ yang telah bersih dan diformat, siap untuk pelatihan.
+  - **Format Waktu:** Memastikan kolom `timestamp` bertipe datetime.
+  - **Label Encoding:** Mengubah `conditions` menjadi numerik.
+  - **Feature Engineering (Baru):** Membuat fitur "Lag" (nilai masa lalu) dan "Rolling Mean" untuk menangkap pola tren.
+    - `lag_1`: Nilai 1 jam yang lalu.
+    - `lag_24`: Nilai 24 jam yang lalu.
+    - `rolling_mean_24`: Rata-rata 24 jam terakhir.
+  - **Handling NaN:** Menghapus baris awal yang memiliki nilai `NaN` akibat pembuatan fitur lag.
+- **Output yang Diharapkan:** Dataset dengan kolom fitur tambahan (`temperature_lag_1`, dll).
 
-### 4\. Pelatihan dan Perbandingan Model (Sesuai Bagian 5.3)
+### 4\. Pelatihan dan Perbandingan Model
 
-- **Tujuan:** Melatih dan membandingkan empat model regresi untuk memilih yang terbaik.
+- **Tujuan:** Melatih dan membandingkan model dengan strategi validasi yang tepat untuk data waktu.
 - **Langkah:**
-  - **Definisi Fitur (X) dan Target (Y):** Target adalah variabel kontinu: _temperature_, _humidity_, _wind speed_, dan _atmospheric pressure_. (rencana tambahan untuk isRaining dan Condition klasifikasi)
-  - **Pembagian Data:** Membagi data menjadi 80% _training_ dan 20% _testing_.
-  - **Pelatihan Model:** Melatih empat model regresi: **Linear Regression, Decision Tree Regressor, K-Nearest Neighbors Regressor,** dan **Random Forest Regressor**.
-  - **Evaluasi:** Mengevaluasi kinerja model menggunakan metrik standar: **Mean Squared Error (MSE), Mean Absolute Error (MAE), Root Mean Squared Error (RMSE),** dan **R-squared ($R^{2}$) score** (Akurasi).
-- **Output yang Diharapkan:**
-  - **Tabel Perbandingan Metrik (Mirip Tabel 4):** Menunjukkan nilai MSE, MAE, RMSE, dan Akurasi ($R^{2}$) untuk setiap model, yang menegaskan **Random Forest Regressor** sebagai model terbaik (MSE: 23.09, MAE: 1.97, RMSE: 4.81, $R^{2}$: 0.908).
+  - **Time-Series Split (Baru):** Menggunakan pemisahan berdasarkan waktu, bukan acak.
+    - **Training:** Data sebelum 1 Januari 2020.
+    - **Testing:** Data setelah 1 Januari 2020.
+  - **Pelatihan Model:** Melatih Linear Regression, Decision Tree, KNN, dan Random Forest.
+  - **Evaluasi:** Menggunakan MSE, MAE, RMSE, dan $R^{2}$.
+- **Output yang Diharapkan:** Tabel perbandingan yang menunjukkan Random Forest sebagai model terbaik dengan $R^{2}$ yang tinggi (> 0.90) berkat fitur lag.
 
-### 5\. Analisis Hasil dan Kinerja Individual Parameter (Sesuai Bagian 5.4)
+### 5\. Analisis Hasil dan Kinerja Individual Parameter
 
-- **Tujuan:** Menampilkan kinerja model terbaik (_Random Forest Regressor_) pada setiap parameter cuaca individual yang diprediksi.
+- **Tujuan:** Evaluasi mendalam model terbaik (Random Forest) untuk semua parameter: Suhu, Kelembaban, Kecepatan Angin, Tekanan.
 - **Langkah:**
-  - Melatih ulang _Random Forest Regressor_ untuk setiap variabel target (_Temperature_, _Humidity_, _Wind speed_, _Pressure_).
-  - Menghitung dan mencatat metrik evaluasi (MAE, RMSE, $R^{2}$) untuk setiap parameter.
-- **Output yang Diharapkan:**
-  - **Tabel Evaluasi Kinerja Parameter (Mirip Tabel 5):** Menunjukkan MAE, RMSE, dan $R^{2}$ untuk **Suhu** ($R^{2}=0.91$), **Kelembaban** ($R^{2}=0.88$), **Kecepatan Angin** ($R^{2}=0.87$), dan **Tekanan** ($R^{2}=0.89$).
-  - Visualisasi perbandingan menggunakan library pyhon untuk barplot.
+  - Melatih ulang Random Forest untuk setiap target menggunakan fitur lag yang sesuai.
+  - Mencatat metrik evaluasi.
+- **Output yang Diharapkan:** Tabel kinerja per parameter dan grafik batang perbandingan $R^{2}$.
 
 ### 6. Penyimpanan Model Terbaik
 
-- **Tujuan:** Menyimpan model _Random Forest Regressor_ yang telah dilatih dan dianggap terbaik untuk digunakan pada _backend_ (FastAPI) ([weatherapp_backend](..\weatherapp_backend\main.py)).
-- **Langkah:** Menyimpan objek model terbaik ke dalam file **`.pkl`** menggunakan `joblib` atau `pickle`.
-- **Output yang Diharapkan:** Konfirmasi model terbaik telah disimpan ke satu file **`.pkl/_pkl`**.
+- **Tujuan:** Menyimpan model yang telah dilatih ke file `.pkl`.
+- **Langkah:** Menyimpan dictionary berisi model terbaik untuk setiap parameter.
+- **Output yang Diharapkan:** File `weather_prediction_models_improved.pkl` tersimpan di folder `models/`.
 
-### 7. Visualisasi Perbandingan Aktual vs. Prediksi (Sesuai Bagian 5.3)
+### 7. Visualisasi Perbandingan Aktual vs. Prediksi
 
-- **Tujuan:** Memvisualisasikan seberapa dekat nilai yang diprediksi oleh model terbaik (Random Forest) dengan nilai aktual untuk periode data uji.
-- **Langkah:** Membuat plot garis terpisah untuk setiap parameter cuaca yang diprediksi. Periode yang divisualisasikan dalam dokumen adalah **Januari 2020**. (Tampilkan label tanggal pada grafik sumbu x dengan jeda setiap 4 hari). data yang divisualisasikan adalah per-hari.
-- **Visualisasi yang Diharapkan:**
-  - **Grafik 1 (Mirip Gambar 15):** **Actual vs Predicted Temperature** (Garis biru untuk Aktual, Garis merah putus-putus untuk Prediksi).
-  - **Grafik 2 (Mirip Gambar 16):** **Actual vs Predicted Humidity** (Garis biru untuk Aktual, Garis merah putus-putus untuk Prediksi).
-  - **Grafik 3 (Mirip Gambar 17):** **Actual vs Predicted Wind Speed** (Garis biru untuk Aktual, Garis merah putus-putus untuk Prediksi).
-  - **Grafik 4 (Mirip Gambar 18):** **Actual vs Predicted Pressure** (Garis biru untuk Aktual, Garis merah putus-putus untuk Prediksi).
+- **Tujuan:** Memvisualisasikan performa model pada data uji (Januari 2020).
+- **Langkah:**
+  - Mengambil data Januari 2020.
+  - Melakukan prediksi menggunakan fitur lag yang telah dibuat.
+  - Agregasi ke level Harian (Daily Mean) untuk plot yang lebih bersih.
+- **Visualisasi yang Diharapkan:** 4 Grafik garis (Suhu, Kelembaban, Angin, Tekanan) di mana garis Prediksi (Merah Putus-putus) mengikuti garis Aktual (Biru) dengan sangat dekat.
 
-### 8. Visualisasi Dampak Data Inkremental (Sesuai Bagian 5.6)
+### 8. Visualisasi Dampak Data Inkremental
 
-- **Tujuan:** Menunjukkan bagaimana akurasi model meningkat seiring bertambahnya jumlah _data points_ untuk mendukung pendekatan _Incremental Learning_.
-- **Visualisasi yang Diharapkan:**
-  - **Grafik 5 (Mirip Gambar 21):** Grafik garis yang menunjukkan peningkatan skor $R^{2}$ (%) seiring bertambahnya jumlah _Data Points_.
+- **Tujuan:** Demonstrasi konsep _Incremental Learning_.
+- **Langkah:** Melatih model dengan pecahan data training (10%, 20%, ... 100%) dan mengukur $R^{2}$ pada data test yang tetap.
+- **Visualisasi yang Diharapkan:** Grafik tren naik yang menunjukkan semakin banyak data historis, semakin akurat modelnya.
