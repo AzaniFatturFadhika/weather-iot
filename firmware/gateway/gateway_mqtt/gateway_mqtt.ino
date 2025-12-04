@@ -487,10 +487,10 @@ void parseAndPublish(String data, int rssi, float snr) {
   JsonObject precipitation = doc.createNestedObject("precipitation");
   precipitation["@type"] = "QuantitativeValue";
   precipitation["rawLevel"] = rainValue;
-  precipitation["unitCode"] = "ADC";
-  precipitation["unitText"] = "ADC (0-1023)";
+  precipitation["unitCode"] = "BIN";
+  precipitation["unitText"] = "Binary (0=Dry, 1=Wet)";
   precipitation["sensor"] = "Raindrop";
-  precipitation["note"] = "0=basah, 1023=kering";
+  precipitation["note"] = "0=Dry, 1=Wet";
   
   // ===== ILLUMINANCE (Custom extension) =====
   JsonObject illuminance = doc.createNestedObject("illuminance");

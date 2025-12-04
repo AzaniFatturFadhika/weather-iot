@@ -61,7 +61,7 @@ struct WeatherData {
   float humidity;         // dari AHT20
   float pressure;         // dari BMP280
   float windSpeed;        // dari Anemometer (km/h)
-  int rainLevel;          // dari Raindrop sensor (0-1023)
+  int rainLevel;          // dari Raindrop sensor (0=Dry, 1=Wet)
   int lightLevel;         // dari LDR (0-1023)
 };
 
@@ -219,7 +219,10 @@ WeatherData readAllSensors() {
   }
   
   // ===== Baca sensor analog =====
-  data.rainLevel = analogRead(RAINDROP_PIN);
+  // Raindrop: 0 = Dry, 1 = Wet (Threshold: 800)
+  int rainRaw = analogRead(RAINDROP_PIN);
+  data.rainLevel = (rainRaw < 800) ? 1 : 0;
+  
   data.lightLevel = analogRead(LDR_PIN);
   
   return data;
@@ -261,7 +264,7 @@ void printSensorData(WeatherData data) {
   Serial.print("[AHT20] Humidity: "); Serial.print(data.humidity, 2); Serial.println(" %");
   Serial.print("[BMP280] Pressure: "); Serial.print(data.pressure, 2); Serial.println(" hPa");
   Serial.print("[Anemometer] Wind Speed: "); Serial.print(data.windSpeed, 2); Serial.println(" km/h");
-  Serial.print("[Raindrop] Rain Level: "); Serial.print(data.rainLevel); Serial.println(" (0-1023 ADC)");
+  Serial.print("[Raindrop] Rain Level: "); Serial.print(data.rainLevel); Serial.println(" (0=Dry, 1=Wet)");
   Serial.print("[LDR] Light Level: "); Serial.print(data.lightLevel); Serial.println(" (0-1023 ADC)");
   Serial.println("===================================================\n");
 }

@@ -184,9 +184,8 @@ void sendToBackend(float temp, float hum, float press, float wind, int rain, int
     url += "&pressure=" + String(press, 2);
     url += "&windSpeed=" + String(wind, 2);
     
-    // Konversi nilai analog rain ke boolean isRaining (sesuai logika backend lama)
-    // Asumsi: nilai rendah = basah (sensor resistif)
-    int isRaining = (rain < 500) ? 1 : 0; 
+    // Nilai rain sudah berupa 0 (Dry) atau 1 (Wet) dari transmitter
+    int isRaining = rain; 
     url += "&isRaining=" + String(isRaining);
     
     url += "&lightIntensity=" + String(light);
