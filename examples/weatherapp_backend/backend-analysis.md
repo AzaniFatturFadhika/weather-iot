@@ -49,13 +49,20 @@ Dokumen ini berisi analisis teknis mendalam terhadap kode sumber backend yang ad
 *   **Endpoint `/weather-data/line-chart`**: Mengambil 10 data `windSpeed` terakhir (hardcoded lokasi "Gazipur"). Sangat spesifik dan tidak fleksibel.
 
 #### E. Machine Learning & Prediksi
+#### E. Machine Learning & Prediksi
 *   **Endpoint**: `/weather-data/get-predicted-data`
 *   **Model**: Memuat file `rf_model_pkl` (kemungkinan Random Forest) menggunakan `pickle`.
-*   **Logika**:
-    *   Menerima input tanggal (hari, bulan, tahun).
-    *   Melakukan iterasi untuk memprediksi cuaca 3 hari ke depan.
-    *   Output mencakup: suhu (max/min/avg), kelembaban, angin, tekanan, dan kondisi cuaca.
-*   **Mapping Kondisi**: Mengubah output numerik model (0-5) menjadi teks deskriptif (e.g., 'Clear', 'Rain').
+*   **Logika Prediksi**:
+    1.  **Input**: Menerima parameter `day`, `month`, `year`.
+    2.  **Looping**: Melakukan iterasi 3 kali untuk memprediksi cuaca tanggal tersebut dan 2 hari berikutnya.
+    3.  **Load Model**: Membuka dan memuat model `rf_model_pkl` di setiap iterasi (tidak efisien).
+    4.  **Eksekusi**: Memanggil `rf_model.predict(features)` dengan fitur `[day, month, year]`.
+    5.  **Output**: Mengembalikan 7 nilai prediksi (suhu, kelembaban, dll) dan mapping kondisi cuaca (0-5) ke teks.
+*   **Analisis Incremental Learning**:
+    *   **Status**: ❌ **BELUM DIIMPLEMENTASIKAN**.
+    *   **Temuan**: Kode hanya memiliki fitur **Data Collection** via endpoint `/weather-data/create` (INSERT ke DB).
+    *   **Kekurangan**: Tidak ada logika untuk melatih ulang model (`fit` / `partial_fit`) secara otomatis saat data baru masuk. Model `rf_model_pkl` bersifat statis.
+    *   **Rekomendasi**: Perlu background worker (misal Celery/APScheduler) untuk mengambil data baru dari DB secara berkala, melatih ulang model, dan memperbarui file `.pkl`.
 
 ### 3. Audit Keamanan & Kualitas Kode
 1.  **Hardcoded Secrets**: Password email dan konfigurasi DB terekspos dalam kode sumber.
