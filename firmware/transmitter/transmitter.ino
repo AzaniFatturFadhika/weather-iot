@@ -26,7 +26,7 @@
 #define ANEMOMETER_PIN  3  // Interrupt pin
 
 // Raindrop Sensor
-#define RAINDROP_PIN    A0
+#define RAINDROP_PIN    A0 // Hubungkan ke pin DO (Digital Output) sensor
 
 // LDR (Light Dependent Resistor)
 #define LDR_PIN         A1
@@ -218,10 +218,10 @@ WeatherData readAllSensors() {
     data.windSpeed = 0;
   }
   
-  // ===== Baca sensor analog =====
-  // Raindrop: 0 = Dry, 1 = Wet (Threshold: 800)
-  int rainRaw = analogRead(RAINDROP_PIN);
-  data.rainLevel = (rainRaw < 800) ? 1 : 0;
+  // ===== Baca sensor analog & digital =====
+  // Raindrop (Digital Mode): Read DO pin. LOW = Wet, HIGH = Dry
+  int rainDigital = digitalRead(RAINDROP_PIN);
+  data.rainLevel = (rainDigital == LOW) ? 1 : 0;
   
   data.lightLevel = analogRead(LDR_PIN);
   
