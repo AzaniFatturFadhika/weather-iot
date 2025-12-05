@@ -247,11 +247,110 @@ Menampilkan metrik terpisah untuk setiap target:
 
 ### 7. Penyimpanan Model Terbaik (Single File)
 
-- **Tujuan:** Menyimpan semua model yang telah dilatih ke dalam **SATU file `.pkl`** agar mudah dimuat oleh Backend.
-- **Langkah:**
-  - Membuat dictionary: `{'regressor': model_reg, 'classifier': model_clf, 'version': '2.0'}`.
-  - Menyimpan dictionary tersebut menggunakan `joblib` atau `pickle`.
-- **Output yang Diharapkan:** File `weather_model_v2.pkl` tersimpan di folder `models/`.
+- **Tujuan:** Menyimpan semua model dan metadata yang diperlukan ke dalam **SATU file `.pkl`** agar mudah dimuat oleh Backend untuk inference.
+
+#### 7.1 Struktur File .pkl
+
+Model disimpan dalam format dictionary dengan struktur berikut:
+
+```python
+model_package = {
+    # Model
+    'regressor': final_regressor,           # RandomForestRegressor (atau model terbaik)
+    'classifier': final_classifier,         # RandomForestClassifier (atau model terbaik)
+    
+    # Metadata untuk Feature Engineering
+    'feature_columns': feature_cols,        # List kolom fitur yang digunakan
+    'target_regression': ['temp', 'humidity', 'windspeed', 'sealevelpressure'],
+    'target_classification': 'weather_code',
+    
+    # Encoder (untuk decode hasil prediksi)
+    'label_encoder': le_conditions,         # LabelEncoder untuk conditions
+    
+    # Mapping weather_code ke rain (deterministik)
+    'weather_code_to_rain': {
+        0: 0, 1: 0, 2: 0, 3: 0,
+        51: 0.2, 53: 0.7, 55: 1.1,
+        61: 1.7, 63: 4.0, 65: 10.3
+    },
+    
+    # Versi dan info
+    'version': '2.0',
+    'trained_date': datetime.now().isoformat(),
+    'data_range': {'start': '2000-01-01', 'end': '2024-12-31'}
+}
+```
+
+#### 7.2 Menyimpan Model (Training)
+
+```python
+import joblib
+from datetime import datetime
+
+# Simpan ke file .pkl
+MODEL_PATH = 'models/weather_model_v2.pkl'
+joblib.dump(model_package, MODEL_PATH)
+
+print(f"✅ Model disimpan ke: {MODEL_PATH}")
+print(f"   - Regressor: {type(model_package['regressor']).__name__}")
+print(f"   - Classifier: {type(model_package['classifier']).__name__}")
+```
+
+#### 7.3 Memuat Model (Inference/Backend)
+
+```python
+import joblib
+
+# Load model package
+model_package = joblib.load('models/weather_model_v2.pkl')
+
+# Akses komponen
+regressor = model_package['regressor']
+classifier = model_package['classifier']
+feature_cols = model_package['feature_columns']
+rain_map = model_package['weather_code_to_rain']
+
+# Contoh prediksi
+X_new = prepare_features(input_data, feature_cols)  # Siapkan fitur
+pred_values = regressor.predict(X_new)              # Prediksi temp, hum, wind, pressure
+pred_code = classifier.predict(X_new)               # Prediksi weather_code
+pred_rain = rain_map.get(pred_code[0], 0)           # Derive rain dari weather_code
+```
+
+#### 7.4 Sinkronisasi dengan Backend API
+
+Backend (`main.py`) harus menggunakan struktur yang sama:
+
+```python
+# Di main.py atau model_loader.py
+class WeatherPredictor:
+    def __init__(self, model_path: str):
+        self.package = joblib.load(model_path)
+        self.regressor = self.package['regressor']
+        self.classifier = self.package['classifier']
+        self.feature_cols = self.package['feature_columns']
+        self.rain_map = self.package['weather_code_to_rain']
+    
+    def predict(self, features: dict) -> dict:
+        X = self._prepare_features(features)
+        
+        # Regresi
+        reg_pred = self.regressor.predict(X)[0]
+        
+        # Klasifikasi
+        weather_code = self.classifier.predict(X)[0]
+        
+        return {
+            'temp': reg_pred[0],
+            'humidity': reg_pred[1],
+            'windspeed': reg_pred[2],
+            'pressure': reg_pred[3],
+            'weather_code': int(weather_code),
+            'rain': self.rain_map.get(int(weather_code), 0)
+        }
+```
+
+- **Output yang Diharapkan:** File `weather_model_v2.pkl` tersimpan di folder `models/` dengan ukuran ~50-200 MB (tergantung model).
 
 ### 8. Implementasi Multi-Step Forecasting (Recursive Strategy)
 
