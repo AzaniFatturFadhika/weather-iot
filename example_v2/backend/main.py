@@ -1,394 +1,435 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Path
-import secrets
-import asyncio
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from fastapi.middleware.cors import CORSMiddleware
-import MySQLdb
+"""
+Weather Prediction API Backend
+================================
+Backend untuk melakukan prediksi cuaca menggunakan time-series model
+yang telah dilatih dengan fitur lag dan rolling mean.
+"""
+
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import bcrypt
+import joblib
+import pandas as pd
 import numpy as np
-from sklearn.linear_model import LinearRegression
-import pickle
-import uvicorn
+import os
 from datetime import datetime, timedelta
+from typing import List, Optional
 
-db_config = {
-    'host': 'localhost',
-    'user': 'root',
-    'passwd': '',
-    'db': 'ums',
-}
-
-
-class User(BaseModel):
-    username: str
-    password: str
-    email: str
-    role: str
-    otp: int
-
-
-conn = MySQLdb.connect(**db_config)
 app = FastAPI()
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
+# ============================================================================
+# LOAD MODELS
+# ============================================================================
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, '../models/weather_model_v2.pkl')
+HISTORICAL_DATA_PATH = os.path.join(BASE_DIR, '../data_collections/datasets/historical_data_2000_2024.csv')
 
-# OTP related...
-async def remove_otp(email: str):
-    await asyncio.sleep(300)  # Remove OTP after 5 minutes
-    if email in otp_map:
-        del otp_map[email]
+models = {}
+historical_df = None
 
-
-otp_map = {}
-
-
-def send_email(subject, message, to_email):
-    try:
-        # Set up the email server
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-
-        # Replace 'YOUR_EMAIL_USERNAME' and 'YOUR_EMAIL_PASSWORD' with your actual email credentials
-        email_username = '1901029@iot.bdu.ac.bd'
-        email_password = 'ohvgfbujrmliuepi'
-
-        server.login(email_username, email_password)
-
-        # Create message
-        msg = MIMEMultipart()
-        msg['From'] = email_username
-        msg['To'] = to_email
-        msg['Subject'] = subject
-        msg.attach(MIMEText(message, 'plain'))
-
-        # Send the email
-        server.sendmail(email_username, to_email, msg.as_string())
-        print("Email sent successfully!")
-    except smtplib.SMTPException as e:
-        print(f"Failed to send email: {e}")
-    finally:
-        server.quit()
-
-
-@app.post("/generate_otp/")
-async def generate_otp(email: str):
-    print(f"Received email: {email}")
-    if '@' not in email or '.' not in email:
-        raise HTTPException(status_code=400, detail="Invalid email format")
-
-    otp = str(secrets.randbelow(900000) + 100000)  # Generate a 6-digit OTP
-    otp_map[email] = otp
-    asyncio.create_task(remove_otp(email))
-    send_email("User Verification", f"Your OTP is: {otp}", email)
-    print(f"OTP for {email} is: {otp}")
-    cursor = conn.cursor()
-    query = "UPDATE otp SET otp=%s, createAt=CURRENT_TIMESTAMP WHERE email=%s"
-    cursor.execute(query, (otp, email))
-    affectedRows = cursor.rowcount
-    if affectedRows == 0:
-        query = "INSERT INTO otp(email, otp) VALUES (%s, %s)"
-        cursor.execute(query, (email, otp))
-    conn.commit()
-    cursor.close()
-
-    return {"message": "OTP generated successfully."}
-
-
-# ...OTP related
-
-# User related...
-@app.options("/users/")
-async def options_users():
-    return {"allow": "GET, POST, PUT, DELETE, OPTIONS"}
-
-
-@app.post("/users/")
-def create_user(user: User):
-    hashed_password = bcrypt.hashpw(user.password.encode('utf-8'), bcrypt.gensalt())
-    cursor = conn.cursor()
-
-    print(user)
-    query = "SELECT otp FROM otp WHERE email=%s"
-    cursor.execute(query, (user.email,))
-    row = cursor.fetchone()
-    prevOtp = row[0]
-    print(f'prevOtp: {prevOtp}')
-
-    msg = ''
-    status = ''
-    if prevOtp == user.otp:
-        print("OTP matched")
-        query = "INSERT INTO users (username, password, email, role) VALUES (%s, %s, %s, %s)"
-        cursor.execute(query, (user.username, hashed_password, user.email, user.role))
-        status = 200
-        msg = "User created successfully"
+try:
+    if os.path.exists(MODEL_PATH):
+        models = joblib.load(MODEL_PATH)
+        print(f"✓ Models loaded successfully from {MODEL_PATH}")
+        print(f"  - Regressor: {models['model_type']['regressor']}")
+        print(f"  - Classifier: {models['model_type']['classifier']}")
+        print(f"  - Version: {models['version']}")
+        print(f"  - Trained: {models['trained_date']}")
     else:
-        print("OTP not matched")
-        status = 403
-        msg = "Otp not matched"
+        print(f"⚠ Warning: Model file not found at {MODEL_PATH}")
+except Exception as e:
+    print(f"✗ Error loading models: {e}")
 
-    print(f'msg: {msg}')
-    print(f'status: {status}')
+try:
+    if os.path.exists(HISTORICAL_DATA_PATH):
+        historical_df = pd.read_csv(HISTORICAL_DATA_PATH)
+        historical_df['timestamp'] = pd.to_datetime(historical_df['timestamp'])
+        historical_df = historical_df.sort_values('timestamp').reset_index(drop=True)
+        print(f"✓ Historical data loaded: {len(historical_df):,} records")
+        print(f"  - Date range: {historical_df['timestamp'].min()} to {historical_df['timestamp'].max()}")
+    else:
+        print(f"⚠ Warning: Historical data not found at {HISTORICAL_DATA_PATH}")
+except Exception as e:
+    print(f"✗ Error loading historical data: {e}")
 
-    conn.commit()
-    cursor.close()
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def get_recent_data(target_date: datetime, hours_back: int = 24):
+    """
+    Mengambil data historis terkini untuk membuat fitur lag dan rolling mean.
+    
+    Args:
+        target_date: Tanggal target prediksi
+        hours_back: Berapa jam ke belakang yang diambil
+    
+    Returns:
+        DataFrame dengan data historis
+    """
+    if historical_df is None:
+        return None
+    
+    # Cari data sebelum target_date
+    mask = historical_df['timestamp'] < target_date
+    recent_data = historical_df[mask].tail(hours_back)
+    
+    return recent_data
+
+
+def create_lag_features(target_datetime: datetime, hour: int):
+    """
+    Membuat fitur lag dan rolling mean berdasarkan data historis.
+    
+    Args:
+        target_datetime: Datetime target untuk prediksi
+        hour: Jam dalam sehari (0-23)
+    
+    Returns:
+        Dictionary berisi fitur lag untuk prediksi
+    """
+    if historical_df is None:
+        # Jika tidak ada data historis, gunakan nilai default
+        # (ini tidak ideal, sebaiknya selalu ada historical data)
+        return create_default_lag_features()
+    
+    # Ambil data 48 jam terakhir sebelum target
+    recent_data = get_recent_data(target_datetime, hours_back=48)
+    
+    if recent_data is None or len(recent_data) < 24:
+        return create_default_lag_features()
+    
+    # Target columns untuk regression
+    regression_targets = ['temp', 'humidity', 'windspeed', 'sealevelpressure']
+    
+    lag_features = {}
+    
+    for col in regression_targets:
+        # Lag 1 jam: data 1 jam sebelumnya
+        if len(recent_data) >= 1:
+            lag_features[f'{col}_lag_1'] = recent_data[col].iloc[-1]
+        else:
+            lag_features[f'{col}_lag_1'] = recent_data[col].mean()
+        
+        # Lag 24 jam: data 24 jam sebelumnya
+        if len(recent_data) >= 24:
+            lag_features[f'{col}_lag_24'] = recent_data[col].iloc[-24]
+        else:
+            lag_features[f'{col}_lag_24'] = recent_data[col].mean()
+        
+        # Rolling mean 24 jam
+        if len(recent_data) >= 24:
+            lag_features[f'{col}_rolling_mean_24'] = recent_data[col].tail(24).mean()
+        else:
+            lag_features[f'{col}_rolling_mean_24'] = recent_data[col].mean()
+    
+    return lag_features
+
+
+def create_default_lag_features():
+    """
+    Membuat fitur lag default jika tidak ada data historis.
+    Nilai default berdasarkan kondisi rata-rata.
+    """
+    regression_targets = ['temp', 'humidity', 'windspeed', 'sealevelpressure']
+    
+    # Nilai default (bisa disesuaikan dengan kondisi rata-rata lokasi)
+    defaults = {
+        'temp': 25.0,
+        'humidity': 75.0,
+        'windspeed': 5.0,
+        'sealevelpressure': 1010.0
+    }
+    
+    lag_features = {}
+    for col in regression_targets:
+        lag_features[f'{col}_lag_1'] = defaults[col]
+        lag_features[f'{col}_lag_24'] = defaults[col]
+        lag_features[f'{col}_rolling_mean_24'] = defaults[col]
+    
+    return lag_features
+
+
+def create_cyclical_features(hour: int, month: int):
+    """
+    Membuat fitur cyclical (sine/cosine) untuk hour dan month.
+    """
     return {
-        'status': status,
-        'msg': msg
+        'hour_sin': np.sin(2 * np.pi * hour / 24),
+        'hour_cos': np.cos(2 * np.pi * hour / 24),
+        'month_sin': np.sin(2 * np.pi * month / 12),
+        'month_cos': np.cos(2 * np.pi * month / 12)
     }
 
 
-# ...User related
-class Login(BaseModel):
-    username: str
-    password: str
+def classify_rain(condition: str) -> str:
+    """
+    Klasifikasi apakah kondisi cuaca mengindikasikan hujan atau tidak.
+    """
+    rain_keywords = ['rain', 'drizzle', 'shower', 'thunderstorm']
+    condition_lower = condition.lower()
+    
+    for keyword in rain_keywords:
+        if keyword in condition_lower:
+            return "yes"
+    return "no"
 
 
-@app.post("/login/")
-async def login(user: Login):
-    conn = MySQLdb.connect(**db_config)
-    cursor = conn.cursor()
-    cursor.execute("SELECT password FROM users WHERE username = %s", (user.username,))
-    db_user = cursor.fetchone()
-    cursor.close()
-    conn.close()
-    if db_user and bcrypt.checkpw(user.password.encode(), db_user[0].encode()):
-        return {"message": "Login successful"}
-    else:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+# ============================================================================
+# PYDANTIC MODELS
+# ============================================================================
+
+class HourlyPrediction(BaseModel):
+    hour: int
+    temp: float
+    humidity: int
+    wind_speed: float
+    pressure: float
+    condition: str
+    rain: str
 
 
-# *******
-
-# Read User Info
-# Internal access: http://127.0.0.1:8000/userInfo?username=sayor
-@app.get("/userInfo")
-def getUserInfo(username: str = None):
-    username = username if username is not None else 0
-    cursor = conn.cursor()
-    query = "SELECT username, email FROM users WHERE username=%s"
-    cursor.execute(query, (username,))
-    row = cursor.fetchone()
-    cursor.close()
-    conn.commit()
-
-    print(row);
-
-    if row:
-        return {
-            "username": row[0],
-            "email": row[1],
-        }
-    else:
-        return {}
+class DailySummary(BaseModel):
+    date: str
+    min_temp: float
+    max_temp: float
+    avg_temp: float
+    avg_humidity: float
+    dominant_condition: str
+    rain_probability: float
 
 
-# *******
-
-# Read last weather data
-# Internal access: http://127.0.0.1:8000/weather-data/get/last?location=Gazipur
-@app.get("/weather-data/get/last")
-def getLastWeatherData(location: str = None):
-    location = location if location is not None else 0
-    cursor = conn.cursor()
-    query = "SELECT * FROM weather_data WHERE location=%s ORDER BY id DESC LIMIT 1"
-    cursor.execute(query, (location,))
-    row = cursor.fetchone()
-    cursor.close()
-    conn.commit()
-
-    print(row);
-
-    if row:
-        return {
-            "id": row[0],
-            "temp": row[1],
-            "humidity": row[2],
-            "isRaining": row[3],
-            "lightIntensity": row[4],
-            "windSpeed": row[5],
-            "airPressure": row[6],
-        }
-    else:
-        return {}
+class WeatherPredictionResponse(BaseModel):
+    daily: DailySummary
+    hourly: List[HourlyPrediction]
 
 
-# *******
+# ============================================================================
+# API ENDPOINTS
+# ============================================================================
 
-# weather prediction
-# Internal access: http://127.0.0.1:8000/weather-data/get-predicted-data?day=7&&month=2&&year=2012
-@app.get("/weather-data/get-predicted-data")
-def getPredictedWeatherData(day: int = None, month: int = None, year: int = None):
-    day = day if day is not None else 0
-    month = month if month is not None else 0
-    year = year if year is not None else 0
-
-    # Create a datetime object for the given date
-    start_date = datetime(year, month, day)
-
-    finalResult = []
-
-    # Generate three consecutive dates starting from the given date
-    for i in range(3):
-        # Increment the date by one day
-        current_date = start_date + timedelta(days=i)
-        day = current_date.strftime('%d')
-        month = current_date.strftime('%m')
-        year = current_date.strftime('%Y')
-        print(f"{day}-{month}-{year}")
-
-        # load saved model
-        with open('rf_model_pkl', 'rb') as f:
-            rf_model = pickle.load(f)
-
-        conditions_mapping = {
-            0: 'Clear',
-            1: 'Overcast',
-            2: 'Partially cloudy',
-            3: 'Rain',
-            4: 'Rain, Overcast',
-            5: 'Rain, Partially cloudy'
-        }
-
-        features = [[day, month, year]]
-
-        # Predict the values
-        predicted_values = rf_model.predict(features)
-
-        # Print the predicted values
-        tempmax = round(predicted_values[0][0], 3)
-        tempmin = round(predicted_values[0][1], 3)
-        temp = round(predicted_values[0][2], 3)
-        humidity = round(predicted_values[0][3], 3)
-        windspeed = round(predicted_values[0][4], 3)
-        pressure = round(predicted_values[0][5], 3)
-        conditions = round(predicted_values[0][6])
-
-        print("Predicted tempmax (C):", tempmax)
-        print("Predicted tempmin (C):", tempmin)
-        print("Predicted temp (C):", temp)
-        print("Predicted humidity (%):", humidity)
-        print("Predicted windspeed (m/s):", windspeed)
-        print("Predicted sea level pressure:", pressure)
-        print("Predicted conditions:", conditions_mapping[conditions])
-
-        finalResult.append({
-                'date': f"{day}-{month}-{year}",
-                'tempmax': tempmax,
-                'tempmin': tempmin,
-                'temp': temp,
-                'humidity': humidity,
-                'windspeed': windspeed,
-                'pressure': pressure,
-                'conditions': conditions_mapping[conditions]
-            })
-
-
-    return finalResult
-
-
-
-# *******
-
-# Get line chart data
-# Internal access: http://127.0.0.1:8000/weather-data/line-chart
-@app.get("/weather-data/line-chart")
-def getLineChartData():
-    cursor = conn.cursor()
-    query = "SELECT windSpeed FROM weather_data WHERE location=%s ORDER BY id DESC LIMIT 10"
-    cursor.execute(query, ("Gazipur",))
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.commit()
-
-    ws = [];
-    for row in rows:
-        ws.append(row[0]);
-
-    return ws
-
-# *******
-
-class User2(BaseModel):
-    password: str
-    email: str
-    otp: int
-
-@app.post("/forgot-password")
-def forgotPassword(user: User2):
-    print(user)
-    hashed_password = bcrypt.hashpw(user.password.encode('utf-8'), bcrypt.gensalt())
-    cursor = conn.cursor()
-
-    query = "SELECT otp FROM otp WHERE email=%s"
-    cursor.execute(query, (user.email,))
-    row = cursor.fetchone()
-    prevOtp = row[0]
-    print(f'prevOtp: {prevOtp}')
-
-    msg = ''
-    status = ''
-    if prevOtp == user.otp:
-        print("OTP matched")
-        query = "UPDATE users SET password=%s WHERE email=%s"
-        cursor.execute(query, (hashed_password, user.email))
-        status = 200
-        msg = "Password updated successfully"
-    else:
-        print("OTP not matched")
-        status = 403
-        msg = "Otp not matched"
-
-    print(f'msg: {msg}')
-    print(f'status: {status}')
-
-    conn.commit()
-    cursor.close()
+@app.get("/")
+def root():
+    """Root endpoint untuk health check."""
     return {
-        'status': status,
-        'msg': msg
+        "status": "online",
+        "service": "Weather Prediction API",
+        "model_loaded": bool(models),
+        "historical_data_loaded": historical_df is not None,
+        "version": models.get('version', 'N/A') if models else 'N/A'
     }
 
-# *******
 
-@app.get("/weather-data/create")
-def newWeatherData(
-        temp: float = None,
-        humidity: float = None,
-        isRaining: int = None,
-        lightIntensity: float = None,
-        windSpeed: float = None,
-        pressure: float = None,
+@app.get("/model-info")
+def get_model_info():
+    """Endpoint untuk mendapatkan informasi model."""
+    if not models:
+        raise HTTPException(status_code=500, detail="Models not loaded")
+    
+    return {
+        "version": models.get('version'),
+        "trained_date": models.get('trained_date'),
+        "regressor": models.get('model_type', {}).get('regressor'),
+        "classifier": models.get('model_type', {}).get('classifier'),
+        "performance": models.get('performance', {}),
+        "features": models.get('feature_names', [])
+    }
+
+
+@app.get("/weather-data/get-predicted-data", response_model=WeatherPredictionResponse)
+def get_predicted_weather_data(
+    day: int, 
+    month: int, 
+    year: int, 
+    hour: Optional[int] = None
 ):
-    # Handle oprional params value
-    temp = temp if temp is not None else 0
-    humidity = humidity if humidity is not None else 0
-    isRaining = isRaining if isRaining is not None else 0
-    lightIntensity = lightIntensity if lightIntensity is not None else 0
-    windSpeed = windSpeed if windSpeed is not None else 0
-    pressure = pressure if pressure is not None else 0
+    """
+    Endpoint untuk mendapatkan prediksi cuaca.
+    
+    Args:
+        day: Tanggal (1-31)
+        month: Bulan (1-12)
+        year: Tahun (contoh: 2025)
+        hour: Jam spesifik (0-23), opsional. Jika tidak diberikan, return semua jam.
+    
+    Returns:
+        JSON dengan prediksi harian dan per jam
+    
+    Example:
+        GET /weather-data/get-predicted-data?day=7&month=2&year=2025
+        GET /weather-data/get-predicted-data?day=7&month=2&year=2025&hour=14
+    """
+    # Validasi input
+    if not models:
+        raise HTTPException(
+            status_code=500, 
+            detail="Models not loaded. Please ensure model file exists."
+        )
+    
+    try:
+        regressor = models['regressor']
+        classifier = models['classifier']
+        le = models['label_encoder']
+        feature_names = models['feature_names']
+    except KeyError as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Model file structure invalid: missing {e}"
+        )
+    
+    # Validasi tanggal
+    try:
+        target_date = datetime(year, month, day)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date: {e}")
+    
+    # Generate predictions untuk semua jam (0-23)
+    hours_to_predict = range(24) if hour is None else [hour]
+    
+    input_features_list = []
+    
+    for h in hours_to_predict:
+        target_datetime = target_date.replace(hour=h)
+        
+        # Buat fitur base
+        base_features = {
+            'year': year,
+            'month': month,
+            'day': day,
+            'hour': h
+        }
+        
+        # Tambahkan cyclical features
+        cyclical_features = create_cyclical_features(h, month)
+        
+        # Tambahkan lag features
+        lag_features = create_lag_features(target_datetime, h)
+        
+        # Gabungkan semua fitur
+        all_features = {**base_features, **cyclical_features, **lag_features}
+        
+        # Pastikan urutan fitur sesuai dengan training
+        ordered_features = [all_features[feat] for feat in feature_names]
+        input_features_list.append(ordered_features)
+    
+    # Convert ke numpy array
+    X_input = np.array(input_features_list)
+    
+    try:
+        # Prediksi Regression (temp, humidity, wind_speed, pressure)
+        pred_reg = regressor.predict(X_input)
+        
+        # Prediksi Classification (weather_code -> conditions)
+        pred_clf = classifier.predict(X_input)
+        pred_conditions = le.inverse_transform(pred_clf)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
+    
+    # Siapkan hasil per jam
+    hourly_results = []
+    temps = []
+    humidities = []
+    rain_hours = 0
+    
+    for i, h in enumerate(hours_to_predict):
+        temp = round(float(pred_reg[i][0]), 1)
+        humidity = round(float(pred_reg[i][1]), 0)
+        wind_speed = round(float(pred_reg[i][2]), 1)
+        pressure = round(float(pred_reg[i][3]), 1)
+        condition = str(pred_conditions[i])
+        rain = classify_rain(condition)
+        
+        temps.append(temp)
+        humidities.append(humidity)
+        
+        if rain == "yes":
+            rain_hours += 1
+        
+        hourly_results.append(HourlyPrediction(
+            hour=h,
+            temp=temp,
+            humidity=int(humidity),
+            wind_speed=wind_speed,
+            pressure=pressure,
+            condition=condition,
+            rain=rain
+        ))
+    
+    # Agregasi harian
+    daily_summary = DailySummary(
+        date=f"{year}-{month:02d}-{day:02d}",
+        min_temp=round(float(min(temps)), 1),
+        max_temp=round(float(max(temps)), 1),
+        avg_temp=round(float(sum(temps) / len(temps)), 1),
+        avg_humidity=round(float(sum(humidities) / len(humidities)), 1),
+        dominant_condition=max(set(pred_conditions), key=list(pred_conditions).count),
+        rain_probability=round(rain_hours / len(hours_to_predict) * 100, 1)
+    )
+    
+    return WeatherPredictionResponse(
+        daily=daily_summary,
+        hourly=hourly_results
+    )
 
-    cursor = conn.cursor()
-    query = "INSERT INTO weather_data(temp, humidity, isRaining, lightIntensity, windSpeed, airPressure) VALUES (%s, %s, %s, %s, %s, %s)"
-    cursor.execute(query, (temp, humidity, isRaining, lightIntensity, windSpeed, pressure))
-    affectedRows = cursor.rowcount
-    cursor.close()
-    conn.commit()
-    if affectedRows == 1:
-        return {"status": 200}
-    else:
-        return {"status": 403}
+
+@app.get("/weather-data/get-range-prediction")
+def get_range_prediction(
+    start_day: int,
+    start_month: int,
+    start_year: int,
+    days: int = 7
+):
+    """
+    Endpoint untuk mendapatkan prediksi cuaca untuk rentang hari.
+    
+    Args:
+        start_day: Tanggal mulai
+        start_month: Bulan mulai
+        start_year: Tahun mulai
+        days: Jumlah hari ke depan (default: 7)
+    
+    Returns:
+        List prediksi untuk setiap hari
+    
+    Example:
+        GET /weather-data/get-range-prediction?start_day=1&start_month=1&start_year=2025&days=7
+    """
+    try:
+        start_date = datetime(start_year, start_month, start_day)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date: {e}")
+    
+    predictions = []
+    
+    for i in range(days):
+        current_date = start_date + timedelta(days=i)
+        
+        try:
+            prediction = get_predicted_weather_data(
+                day=current_date.day,
+                month=current_date.month,
+                year=current_date.year
+            )
+            predictions.append(prediction)
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error predicting date {current_date}: {e}"
+            )
+    
+    return {
+        "start_date": start_date.strftime("%Y-%m-%d"),
+        "end_date": (start_date + timedelta(days=days-1)).strftime("%Y-%m-%d"),
+        "days": days,
+        "predictions": predictions
+    }
+
+
+# ============================================================================
+# MAIN
+# ============================================================================
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
