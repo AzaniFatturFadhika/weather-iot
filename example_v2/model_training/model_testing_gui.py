@@ -6,6 +6,7 @@ GUI untuk menguji model prediksi cuaca dengan fitur:
 - Pemilihan model dinamis (Browse .pkl)
 - Input tanggal FROM (sekarang) TO (pilihan)
 - Support 7 variasi format model
+- Comprehensive Model Info
 
 Requirements:
     pip install joblib numpy tkcalendar
@@ -178,7 +179,8 @@ class WeatherModelGUI:
             'hourly': {'regressor': None, 'classifier': None, 'feature_columns': []},
             'daily': {'regressor': None, 'classifier': None, 'feature_columns': []},
             'version': raw_model.get('version', 'Unknown'),
-            'type': raw_model.get('model_type', 'Unknown')
+            'type': raw_model.get('model_type', 'Unknown'),
+            'trained_date': raw_model.get('trained_date', 'Unknown')
         }
         
         # Case 1: Combined Model
@@ -209,9 +211,6 @@ class WeatherModelGUI:
                 
         return normalized
 
-    # ... [Rest of the GUI methods unchanged: create_range_tab, create_hourly_tab, etc.] ...
-    # I will replicate the rest of the methods to ensure the file is complete
-    
     def create_range_tab(self):
         """Create Date Range Forecast Tab"""
         ttk.Label(self.range_frame, text="Weather Forecast by Date Range",
@@ -221,21 +220,37 @@ class WeatherModelGUI:
         date_frame = ttk.LabelFrame(self.range_frame, text="Select Forecast Period")
         date_frame.pack(fill='x', padx=10, pady=5)
         
+        now = datetime.now()
+        
         # FROM section
         from_frame = ttk.Frame(date_frame)
         from_frame.pack(fill='x', padx=10, pady=10)
         
         ttk.Label(from_frame, text="FROM (Start):", font=('Segoe UI', 11, 'bold')).pack(side='left', padx=5)
         
-        now = datetime.now()
-        self.from_date_label = ttk.Label(from_frame, 
-                                         text=now.strftime("%Y-%m-%d %H:%M"),
-                                         font=('Consolas', 12), foreground='blue')
-        self.from_date_label.pack(side='left', padx=10)
+        # FROM Date picker
+        if TKCALENDAR_AVAILABLE:
+            self.from_date = DateEntry(from_frame, width=12, date_pattern='yyyy-mm-dd',
+                                     year=now.year, month=now.month, day=now.day)
+            self.from_date.pack(side='left', padx=5)
+        else:
+            # Fallback: manual date entry
+            ttk.Label(from_frame, text="Date (YYYY-MM-DD):").pack(side='left', padx=5)
+            self.from_date = ttk.Entry(from_frame, width=12)
+            self.from_date.pack(side='left', padx=5)
+            self.from_date.insert(0, now.strftime("%Y-%m-%d"))
         
-        ttk.Label(from_frame, text="(Current Time)", font=('Segoe UI', 9, 'italic')).pack(side='left')
+        # FROM Time picker
+        ttk.Label(from_frame, text="Hour:").pack(side='left', padx=10)
+        self.from_hour = ttk.Spinbox(from_frame, from_=0, to=23, width=5, format="%02.0f")
+        self.from_hour.pack(side='left', padx=2)
+        self.from_hour.set(now.hour)
         
-        ttk.Button(from_frame, text="Refresh Now", command=self.refresh_from_time).pack(side='left', padx=20)
+        ttk.Label(from_frame, text=":").pack(side='left')
+        
+        self.from_minute = ttk.Spinbox(from_frame, from_=0, to=59, width=5, format="%02.0f")
+        self.from_minute.pack(side='left', padx=2)
+        self.from_minute.set(now.minute)
         
         # TO section
         to_frame = ttk.Frame(date_frame)
@@ -243,7 +258,7 @@ class WeatherModelGUI:
         
         ttk.Label(to_frame, text="TO (End):", font=('Segoe UI', 11, 'bold')).pack(side='left', padx=5)
         
-        # Date picker
+        # TO Date picker
         if TKCALENDAR_AVAILABLE:
             self.to_date = DateEntry(to_frame, width=12, date_pattern='yyyy-mm-dd',
                                      year=now.year, month=now.month, day=now.day)
@@ -255,7 +270,7 @@ class WeatherModelGUI:
             self.to_date.pack(side='left', padx=5)
             self.to_date.insert(0, (now + timedelta(days=3)).strftime("%Y-%m-%d"))
         
-        # Time picker
+        # TO Time picker
         ttk.Label(to_frame, text="Hour:").pack(side='left', padx=10)
         self.to_hour = ttk.Spinbox(to_frame, from_=0, to=23, width=5, format="%02.0f")
         self.to_hour.pack(side='left', padx=2)
@@ -271,7 +286,7 @@ class WeatherModelGUI:
         quick_frame = ttk.Frame(date_frame)
         quick_frame.pack(fill='x', padx=10, pady=5)
         
-        ttk.Label(quick_frame, text="Quick Select:").pack(side='left', padx=5)
+        ttk.Label(quick_frame, text="Quick Select (from Start):").pack(side='left', padx=5)
         ttk.Button(quick_frame, text="+6 hours", command=lambda: self.quick_select(6)).pack(side='left', padx=3)
         ttk.Button(quick_frame, text="+12 hours", command=lambda: self.quick_select(12)).pack(side='left', padx=3)
         ttk.Button(quick_frame, text="+24 hours", command=lambda: self.quick_select(24)).pack(side='left', padx=3)
@@ -310,6 +325,54 @@ class WeatherModelGUI:
         
         self.range_result = scrolledtext.ScrolledText(result_frame, height=18, font=('Consolas', 10))
         self.range_result.pack(fill='both', expand=True, padx=5, pady=5)
+    
+    def get_from_datetime(self):
+        """Get FROM datetime from inputs"""
+        if TKCALENDAR_AVAILABLE:
+            date = self.from_date.get_date()
+        else:
+            date = datetime.strptime(self.from_date.get(), "%Y-%m-%d").date()
+        
+        hour = int(self.from_hour.get())
+        minute = int(self.from_minute.get())
+        
+        return datetime.combine(date, datetime.min.time().replace(hour=hour, minute=minute))
+    
+    def quick_select(self, hours):
+        """Quick select TO date based on hours from FROM date"""
+        try:
+            start_dt = self.get_from_datetime()
+            target = start_dt + timedelta(hours=hours)
+            
+            if TKCALENDAR_AVAILABLE:
+                self.to_date.set_date(target.date())
+            else:
+                self.to_date.delete(0, tk.END)
+                self.to_date.insert(0, target.strftime("%Y-%m-%d"))
+            
+            self.to_hour.set(target.hour)
+            self.to_minute.set(target.minute)
+            
+            self.update_range_info()
+        except:
+            pass
+    
+    def update_range_info(self):
+        """Update info about selected range"""
+        try:
+            from_dt = self.get_from_datetime()
+            to_dt = self.get_to_datetime()
+            
+            delta = to_dt - from_dt
+            hours = int(delta.total_seconds() / 3600)
+            days = delta.days
+            
+            if hours > 0:
+                self.range_info.config(text=f"Duration: {hours} hours ({days} days, {hours % 24} hours)")
+            else:
+                self.range_info.config(text="Invalid range: TO must be after FROM")
+        except:
+            self.range_info.config(text="")
     
     def create_hourly_tab(self):
         """Create Single Hourly Prediction Tab"""
@@ -448,44 +511,87 @@ class WeatherModelGUI:
         self.info_text.pack(fill='both', expand=True, padx=10, pady=5)
         
         ttk.Button(self.info_frame, text="Refresh", command=lambda: self.show_model_info()).pack(pady=5)
-    
-    def refresh_from_time(self):
-        """Refresh FROM time to current"""
-        now = datetime.now()
-        self.from_date_label.config(text=now.strftime("%Y-%m-%d %H:%M"))
-    
-    def quick_select(self, hours):
-        """Quick select TO date based on hours from now"""
-        now = datetime.now()
-        target = now + timedelta(hours=hours)
+
+    def show_model_info(self):
+        """Show full details of the loaded model"""
+        if not self.model:
+            self.info_text.delete(1.0, tk.END)
+            self.info_text.insert(tk.END, "No model loaded. Please load a model first.")
+            return
+
+        self.info_text.delete(1.0, tk.END)
+        lines = []
         
-        if TKCALENDAR_AVAILABLE:
-            self.to_date.set_date(target.date())
+        # 1. Basic Info
+        lines.append("=" * 60)
+        lines.append(f"MODEL INFO: {os.path.basename(self.model_path)}")
+        lines.append("=" * 60)
+        lines.append(f"Type:         {self.model.get('type', 'Unknown')}")
+        lines.append(f"Version:      {self.model.get('version', 'Unknown')}")
+        lines.append(f"Trained Date: {self.model.get('trained_date', 'Unknown')}")
+        lines.append("-" * 60)
+        
+        # 2. Hourly Component
+        lines.append("\n[HOURLY MODEL COMPONENT]")
+        h_reg = self.model['hourly']['regressor']
+        h_clf = self.model['hourly']['classifier']
+        
+        if h_reg:
+            lines.append(f"  Regressor:  AVAILABLE ({h_reg.__class__.__name__})")
+            if hasattr(h_reg, 'n_estimators'): lines.append(f"    - n_estimators: {h_reg.n_estimators}")
+            if hasattr(h_reg, 'max_depth'): lines.append(f"    - max_depth: {h_reg.max_depth}")
         else:
-            self.to_date.delete(0, tk.END)
-            self.to_date.insert(0, target.strftime("%Y-%m-%d"))
+            lines.append("  Regressor:  NOT AVAILABLE")
+            
+        if h_clf:
+            lines.append(f"  Classifier: AVAILABLE ({h_clf.__class__.__name__})")
+        else:
+            lines.append("  Classifier: NOT AVAILABLE")
+            
+        if self.model['hourly'].get('feature_columns'):
+            lines.append("\n  Hourly Features (Input):")
+            for i, f in enumerate(self.model['hourly']['feature_columns']):
+                lines.append(f"    {i+1}. {f}")
         
-        self.to_hour.set(target.hour)
-        self.to_minute.set(target.minute)
+        if self.model['hourly'].get('target_regression'):
+            lines.append(f"\n  Target (Regression): {self.model['hourly']['target_regression']}")
+        if self.model['hourly'].get('target_classification'):
+            lines.append(f"  Target (Classification): {self.model['hourly']['target_classification']}")
+
+        # 3. Daily Component
+        lines.append("\n" + "-" * 60)
+        lines.append("[DAILY MODEL COMPONENT]")
+        d_reg = self.model['daily']['regressor']
+        d_clf = self.model['daily']['classifier']
         
-        self.update_range_info()
+        if d_reg:
+            lines.append(f"  Regressor:  AVAILABLE ({d_reg.__class__.__name__})")
+        else:
+            lines.append("  Regressor:  NOT AVAILABLE")
+            
+        if d_clf:
+            lines.append(f"  Classifier: AVAILABLE ({d_clf.__class__.__name__})")
+        else:
+            lines.append("  Classifier: NOT AVAILABLE")
+
+        if self.model['daily'].get('feature_columns'):
+            lines.append("\n  Daily Features (Input):")
+            for i, f in enumerate(self.model['daily']['feature_columns']):
+                lines.append(f"    {i+1}. {f}")
+        
+        # 4. Metadata Reference
+        lines.append("\n" + "=" * 60)
+        lines.append("REFERENCE: Weather Codes")
+        lines.append("-" * 60)
+        lines.append(f"{'Code':<5} | {'Condition':<20} | {'Rain (mm)'}")
+        for code, cond in WEATHER_CODE_TO_CONDITION.items():
+            rain = WEATHER_CODE_TO_RAIN.get(code, 0)
+            lines.append(f"{code:<5} | {cond:<20} | {rain}")
+            
+        self.info_text.insert(tk.END, "\n".join(lines))
     
-    def update_range_info(self):
-        """Update info about selected range"""
-        try:
-            from_dt = datetime.now()
-            to_dt = self.get_to_datetime()
-            
-            delta = to_dt - from_dt
-            hours = int(delta.total_seconds() / 3600)
-            days = delta.days
-            
-            if hours > 0:
-                self.range_info.config(text=f"Duration: {hours} hours ({days} days, {hours % 24} hours)")
-            else:
-                self.range_info.config(text="Invalid range: TO must be after FROM")
-        except:
-            self.range_info.config(text="")
+    def refresh_from_time(self): # Note: No longer used but kept for compatibility if needed
+        pass
     
     def get_to_datetime(self):
         """Get TO datetime from inputs"""
@@ -506,7 +612,7 @@ class WeatherModelGUI:
             return
         
         try:
-            from_dt = datetime.now()
+            from_dt = self.get_from_datetime()
             to_dt = self.get_to_datetime()
             
             if to_dt <= from_dt:
@@ -801,118 +907,27 @@ class WeatherModelGUI:
             messagebox.showerror("Error", str(e))
     
     def reset_hourly(self):
-        self.single_hour.set(datetime.now().hour)
-        self.single_month.set(datetime.now().month)
+        """Reset hourly inputs"""
         for key, widget in self.hourly_inputs.items():
             widget.delete(0, tk.END)
-            widget.insert(0, str(self.default_hourly.get(key, 0)))
+            widget.insert(0, str(self.default_hourly.get(key.replace('lag_1', 'lag_1'), 0)))
         self.hourly_result.delete(1.0, tk.END)
-    
+
     def reset_daily(self):
+        """Reset daily inputs"""
         for key, widget in self.daily_inputs.items():
             widget.delete(0, tk.END)
-            widget.insert(0, str(self.default_daily.get(key, 0)))
+            widget.insert(0, str(self.default_daily.get(key.replace('lag_1', 'lag_1'), 0)))
         self.daily_result.delete(1.0, tk.END)
-    
-    def show_model_info(self):
-        """Display model information"""
-        self.info_text.delete(1.0, tk.END)
-        
-        if self.model is None:
-            self.info_text.insert(tk.END, "Model not loaded!")
-            return
-        
-        info = []
-        info.append("=" * 60)
-        info.append("WEATHER MODEL DETAILED INFO")
-        info.append("=" * 60)
-        info.append(f"\nPath: {self.model_path}")
-        info.append(f"Version: {self.model.get('version', 'N/A')}")
-        info.append(f"Type: {self.model.get('type', 'Unknown')}")
-        info.append(f"Trained Date: {self.model.get('trained_date', 'N/A')}")
-        
-        # --- HOURLY MODEL ---
-        info.append("\n" + "=" * 60)
-        info.append("HOURLY MODEL CONFIGURATION")
-        info.append("=" * 60)
-        hourly = self.model.get('hourly', {})
-        
-        if hourly.get('regressor'):
-            reg = hourly.get('regressor')
-            clf = hourly.get('classifier')
-            
-            info.append(f"[Regressor]")
-            info.append(f"  Algorithm: {type(reg).__name__}")
-            if hasattr(reg, 'get_params'):
-                params = reg.get_params()
-                info.append(f"  Params: n_estimators={params.get('n_estimators', 'N/A')}, max_depth={params.get('max_depth', 'N/A')}")
-            
-            info.append(f"\n[Classifier]")
-            info.append(f"  Algorithm: {type(clf).__name__}")
-            if hasattr(clf, 'get_params'):
-                params = clf.get_params()
-                info.append(f"  Params: n_estimators={params.get('n_estimators', 'N/A')}, max_depth={params.get('max_depth', 'N/A')}")
-            
-            info.append(f"\n[Features ({len(self.hourly_features)})]")
-            for i, f in enumerate(self.hourly_features, 1):
-                info.append(f"  {i}. {f}")
-                
-            info.append(f"\n[Targets]")
-            info.append(f"  Regression: {hourly.get('target_regression', [])}")
-            info.append(f"  Classification: {hourly.get('target_classification', 'N/A')}")
-        else:
-            info.append("Status: NOT AVAILABLE")
-
-        # --- DAILY MODEL ---
-        info.append("\n" + "=" * 60)
-        info.append("DAILY MODEL CONFIGURATION")
-        info.append("=" * 60)
-        daily = self.model.get('daily', {})
-        
-        if daily.get('regressor'):
-            reg = daily.get('regressor')
-            clf = daily.get('classifier')
-            
-            info.append(f"[Regressor]")
-            info.append(f"  Algorithm: {type(reg).__name__}")
-            if hasattr(reg, 'get_params'):
-                params = reg.get_params()
-                info.append(f"  Params: n_estimators={params.get('n_estimators', 'N/A')}, max_depth={params.get('max_depth', 'N/A')}")
-            
-            info.append(f"\n[Classifier]")
-            info.append(f"  Algorithm: {type(clf).__name__}")
-            if hasattr(clf, 'get_params'):
-                params = clf.get_params()
-                info.append(f"  Params: n_estimators={params.get('n_estimators', 'N/A')}, max_depth={params.get('max_depth', 'N/A')}")
-            
-            info.append(f"\n[Features ({len(self.daily_features)})]")
-            for i, f in enumerate(self.daily_features, 1):
-                info.append(f"  {i}. {f}")
-                
-            info.append(f"\n[Targets]")
-            info.append(f"  Regression: {daily.get('target_regression', [])}")
-            info.append(f"  Classification: {daily.get('target_classification', 'N/A')}")
-        else:
-            info.append("Status: NOT AVAILABLE")
-            
-        # --- MAPPINGS ---
-        info.append("\n" + "=" * 60)
-        info.append("WEATHER CODE MAPPING")
-        info.append("=" * 60)
-        rain_map = self.model.get('weather_code_to_rain', WEATHER_CODE_TO_RAIN)
-        info.append(f"{'Code':<5} | {'Condition':<20} | {'Rain (mm)'}")
-        info.append("-" * 45)
-        for code in sorted(rain_map.keys()):
-            cond = WEATHER_CODE_TO_CONDITION.get(code, 'Unknown')
-            rain = rain_map[code]
-            info.append(f"{code:<5} | {cond:<20} | {rain:.1f}")
-            
-        self.info_text.insert(tk.END, "\n".join(info))
-
-def main():
-    root = tk.Tk()
-    app = WeatherModelGUI(root)
-    root.mainloop()
 
 if __name__ == "__main__":
-    main()
+    root = tk.Tk()
+    
+    # Configure style
+    style = ttk.Style()
+    style.theme_use('clam')
+    style.configure('TLabel', font=('Segoe UI', 10))
+    style.configure('TButton', font=('Segoe UI', 10, 'bold'))
+    
+    app = WeatherModelGUI(root)
+    root.mainloop()
