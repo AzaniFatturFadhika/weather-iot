@@ -16,36 +16,36 @@ Berikut adalah kerangka urutan/struktur _notebook_ `ipynb` untuk melakukan _trai
 
 Dataset berisi data cuaca per-jam dari tahun 2000-2024 dengan struktur kolom sebagai berikut:
 
-| Kolom | Tipe | Deskripsi |
-|-------|------|-----------|
-| `id` | int | ID unik |
-| `timestamp` | datetime | Waktu pengukuran (per-jam) |
-| `hour`, `day`, `month`, `year` | int | Komponen waktu |
-| `temp` | float | Suhu (°C) |
-| `humidity` | int | Kelembaban (%) |
-| `windspeed` | float | Kecepatan angin (km/h) |
-| `sealevelpressure` | float | Tekanan permukaan laut (hPa) |
-| `rain` | float | Curah hujan (mm) |
-| `precipitation` | float | Presipitasi (mm) - identik dengan rain |
-| `apparent_temperature` | float | Suhu yang dirasakan (°C) |
-| `surface_pressure` | float | Tekanan permukaan (hPa) |
-| `weather_code` | int | Kode cuaca (0-65) |
-| `conditions` | string | Kondisi cuaca (teks) |
-| `temp_max_daily` | float | Suhu maksimum harian (°C) |
-| `temp_min_daily` | float | Suhu minimum harian (°C) |
-| `weather_code_daily` | int | Kode cuaca harian |
-| `temp_mean_daily` | float | Suhu rata-rata harian (°C) |
+| Kolom                                  | Tipe     | Deskripsi                              |
+| -------------------------------------- | -------- | -------------------------------------- |
+| `id`                                 | int      | ID unik                                |
+| `timestamp`                          | datetime | Waktu pengukuran (per-jam)             |
+| `hour`, `day`, `month`, `year` | int      | Komponen waktu                         |
+| `temp`                               | float    | Suhu (°C)                             |
+| `humidity`                           | int      | Kelembaban (%)                         |
+| `windspeed`                          | float    | Kecepatan angin (km/h)                 |
+| `sealevelpressure`                   | float    | Tekanan permukaan laut (hPa)           |
+| `rain`                               | float    | Curah hujan (mm)                       |
+| `precipitation`                      | float    | Presipitasi (mm) - identik dengan rain |
+| `apparent_temperature`               | float    | Suhu yang dirasakan (°C)              |
+| `surface_pressure`                   | float    | Tekanan permukaan (hPa)                |
+| `weather_code`                       | int      | Kode cuaca (0-65)                      |
+| `conditions`                         | string   | Kondisi cuaca (teks)                   |
+| `temp_max_daily`                     | float    | Suhu maksimum harian (°C)             |
+| `temp_min_daily`                     | float    | Suhu minimum harian (°C)              |
+| `weather_code_daily`                 | int      | Kode cuaca harian                      |
+| `temp_mean_daily`                    | float    | Suhu rata-rata harian (°C)            |
 
 **Contoh Data (6 baris pertama):**
 
-| id | timestamp | hour | day | month | year | temp | humidity | windspeed | weather_code | conditions |
-|----|-----------|------|-----|-------|------|------|----------|-----------|--------------|------------|
-| 0 | 2000-01-01 00:00:00 | 0 | 1 | 1 | 2000 | 21.8 | 98 | 4.0 | 3 | Overcast |
-| 1 | 2000-01-01 01:00:00 | 1 | 1 | 1 | 2000 | 21.4 | 99 | 4.0 | 3 | Overcast |
-| 2 | 2000-01-01 02:00:00 | 2 | 1 | 1 | 2000 | 21.4 | 98 | 3.2 | 3 | Overcast |
-| 3 | 2000-01-01 03:00:00 | 3 | 1 | 1 | 2000 | 21.2 | 99 | 4.6 | 3 | Overcast |
-| 4 | 2000-01-01 04:00:00 | 4 | 1 | 1 | 2000 | 21.0 | 99 | 3.6 | 3 | Overcast |
-| 5 | 2000-01-01 05:00:00 | 5 | 1 | 1 | 2000 | 20.8 | 98 | 2.7 | 3 | Overcast |
+| id | timestamp           | hour | day | month | year | temp | humidity | windspeed | weather_code | conditions |
+| -- | ------------------- | ---- | --- | ----- | ---- | ---- | -------- | --------- | ------------ | ---------- |
+| 0  | 2000-01-01 00:00:00 | 0    | 1   | 1     | 2000 | 21.8 | 98       | 4.0       | 3            | Overcast   |
+| 1  | 2000-01-01 01:00:00 | 1    | 1   | 1     | 2000 | 21.4 | 99       | 4.0       | 3            | Overcast   |
+| 2  | 2000-01-01 02:00:00 | 2    | 1   | 1     | 2000 | 21.4 | 98       | 3.2       | 3            | Overcast   |
+| 3  | 2000-01-01 03:00:00 | 3    | 1   | 1     | 2000 | 21.2 | 99       | 4.6       | 3            | Overcast   |
+| 4  | 2000-01-01 04:00:00 | 4    | 1   | 1     | 2000 | 21.0 | 99       | 3.6       | 3            | Overcast   |
+| 5  | 2000-01-01 05:00:00 | 5    | 1   | 1     | 2000 | 20.8 | 98       | 2.7       | 3            | Overcast   |
 
 ---
 
@@ -87,18 +87,18 @@ Dataset berisi data cuaca per-jam dari tahun 2000-2024 dengan struktur kolom seb
 
 ##### Tabel Mapping Weather Code ke Rain
 
-| Weather Code | Kondisi (conditions) | Rain Mean (mm) | Rain Range (mm) | Jumlah Data |
-|:------------:|----------------------|:--------------:|:---------------:|:-----------:|
-| 0 | Clear | 0.00 | 0.0 | 23,298 |
-| 1 | Partially cloudy | 0.00 | 0.0 | 28,622 |
-| 2 | Partially cloudy | 0.00 | 0.0 | 26,366 |
-| 3 | Overcast | 0.00 | 0.0 | 81,994 |
-| 51 | Rain (Light) | 0.21 | 0.1 - 0.4 | 37,108 |
-| 53 | Rain (Moderate) | 0.66 | 0.5 - 0.9 | 12,421 |
-| 55 | Rain (Heavy Showers) | 1.09 | 1.0 - 1.2 | 3,785 |
-| 61 | Rain, Overcast | 1.74 | 1.3 - 2.4 | 7,333 |
-| 63 | Rain, Overcast | 3.95 | 2.5 - 7.5 | 5,792 |
-| 65 | Rain, Overcast (Heavy) | 10.28 | 7.6 - 33.4 | 585 |
+| Weather Code | Kondisi (conditions)   | Rain Mean (mm) | Rain Range (mm) | Jumlah Data |
+| :----------: | ---------------------- | :------------: | :-------------: | :---------: |
+|      0      | Clear                  |      0.00      |       0.0       |   23,298   |
+|      1      | Partially cloudy       |      0.00      |       0.0       |   28,622   |
+|      2      | Partially cloudy       |      0.00      |       0.0       |   26,366   |
+|      3      | Overcast               |      0.00      |       0.0       |   81,994   |
+|      51      | Rain (Light)           |      0.21      |    0.1 - 0.4    |   37,108   |
+|      53      | Rain (Moderate)        |      0.66      |    0.5 - 0.9    |   12,421   |
+|      55      | Rain (Heavy Showers)   |      1.09      |    1.0 - 1.2    |    3,785    |
+|      61      | Rain, Overcast         |      1.74      |    1.3 - 2.4    |    7,333    |
+|      63      | Rain, Overcast         |      3.95      |    2.5 - 7.5    |    5,792    |
+|      65      | Rain, Overcast (Heavy) |     10.28     |   7.6 - 33.4   |     585     |
 
 ##### Kesimpulan Korelasi
 
@@ -116,6 +116,7 @@ predicted_rain = rain_map[predicted_weather_code]
 ```
 
 Untuk klasifikasi hujan biner (hujan/tidak hujan):
+
 ```python
 is_rain = 1 if weather_code >= 50 else 0
 ```
@@ -136,35 +137,113 @@ is_rain = 1 if weather_code >= 50 else 0
 ### 5\. Pelatihan dan Perbandingan Model (Komprehensif)
 
 - **Tujuan:** Membandingkan berbagai algoritma untuk memilih model terbaik bagi Regresi (data kontinu) dan Klasifikasi (kondisi cuaca).
-- **Langkah:**
-  - **Pemisahan Data:** Menggunakan `Time-Series Split` (Data lama untuk Train, data baru untuk Test).
-  - **Komparasi Regresi (Target: temp, hum, press, wind_speed):**
-    - Melatih dan membandingkan algoritma:
-      1. **Linear Regression**
-      2. **K-Neighbors Regressor**
-      3. **Decision Tree Regressor**
-      4. **Random Forest Regressor**
-      5. **XGBoost Reggressor**
-    - **Evaluasi:** Bandingkan semua parameter performa seperti MSE, MAE, RMSE, dan $R^{2}$. Pilih yang terbaik (biasanya Random Forest).
-  - **Komparasi Klasifikasi (Target: weather_code):**
-    - Melatih dan membandingkan algoritma:
-      1. **Logistic Regression**
-      2. **Decision Tree Classifier**
-      3. **Random Forest Classifier**
-      4. **XGBoost Classifier**
-    - **Evaluasi:** Bandingkan semua parameter performa seperti Accuracy, F1-Score. Pilih yang terbaik.
-- **Output yang Diharapkan:**
-  - Tabel perbandingan metrik untuk 4 algoritma Regresi.
-  - Tabel perbandingan metrik untuk 4 algoritma Klasifikasi.
-  - Kesimpulan pemilihan model terbaik untuk disimpan.
+
+#### 5.1 Pemisahan Data (Time-Series Split)
+
+- **Metode:** Chronological Split (BUKAN random split) untuk menghindari data leakage.
+- **Rasio:** 80% Train (data historis lama) dan 20% Test (data terbaru).
+- **Implementasi:**
+  ```python
+  # Chronological Split - Data HARUS diurutkan berdasarkan timestamp
+  train_size = int(len(df) * 0.8)
+  train_df = df[:train_size]   # Data 2000-2019 (contoh)
+  test_df = df[train_size:]    # Data 2020-2024 (contoh)
+  ```
+
+> **PENTING:** Jangan gunakan `train_test_split()` dengan `shuffle=True` pada data time-series karena akan menyebabkan data leakage.
+
+#### 5.2 Komparasi Model Regresi
+
+- **Target:** `temp`, `humidity`, `windspeed`, `sealevelpressure`
+- **Algoritma yang Dibandingkan:**
+
+| No | Algoritma               | Karakteristik                           |
+| -- | ----------------------- | --------------------------------------- |
+| 1  | Linear Regression       | Baseline, cepat, interpretable          |
+| 2  | K-Neighbors Regressor   | Non-parametric, sensitif terhadap skala |
+| 3  | Decision Tree Regressor | Non-linear, mudah overfit               |
+| 4  | Random Forest Regressor | Ensemble, robust, umumnya terbaik       |
+| 5  | XGBoost Regressor       | Gradient boosting, performa tinggi      |
+
+- **Metrik Evaluasi:** MSE, MAE, RMSE, dan $R^{2}$
+- **Cross-Validation:** Gunakan `TimeSeriesSplit` untuk validasi lebih robust:
+  ```python
+  from sklearn.model_selection import TimeSeriesSplit, cross_val_score
+  tscv = TimeSeriesSplit(n_splits=5)
+  scores = cross_val_score(model, X, y, cv=tscv, scoring='r2')
+  ```
+
+#### 5.3 Komparasi Model Klasifikasi
+
+- **Target:** `weather_code` (10 kelas: 0, 1, 2, 3, 51, 53, 55, 61, 63, 65)
+- **Algoritma yang Dibandingkan:**
+
+| No | Algoritma                | Karakteristik                        |
+| -- | ------------------------ | ------------------------------------ |
+| 1  | Logistic Regression      | Baseline, multi-class dengan OvR     |
+| 2  | Decision Tree Classifier | Cepat, mudah overfit                 |
+| 3  | Random Forest Classifier | Ensemble, balanced accuracy          |
+| 4  | XGBoost Classifier       | Gradient boosting, handle imbalanced |
+
+- **Metrik Evaluasi:** Accuracy, F1-Score (macro/weighted), Precision, Recall
+
+#### 5.4 Output yang Diharapkan
+
+- Tabel perbandingan metrik untuk **5 algoritma Regresi**.
+- Tabel perbandingan metrik untuk **4 algoritma Klasifikasi**.
+- **Kesimpulan:** Model terbaik untuk Regresi dan Klasifikasi (biasanya Random Forest atau XGBoost).
+
+---
 
 ### 6\. Analisis Hasil dan Kinerja Individual Parameter
 
-- **Tujuan:** Evaluasi mendalam model terbaik untuk semua parameter.
+- **Tujuan:** Evaluasi mendalam model terbaik untuk setiap parameter secara individual. misal pada bulan tertentu, januari 2022
+
+#### 6.1 Evaluasi Per-Parameter (Regresi)
+
+Menampilkan metrik terpisah untuk setiap target:
+
+| Parameter   | MAE | RMSE | R² | Keterangan                       |
+| ----------- | --- | ---- | --- | -------------------------------- |
+| Temperature | -   | -    | -   | Target utama                     |
+| Humidity    | -   | -    | -   | -                                |
+| Wind Speed  | -   | -    | -   | Biasanya paling sulit diprediksi |
+| Pressure    | -   | -    | -   | Relatif stabil                   |
+
+#### 6.2 Evaluasi Klasifikasi (Weather Code)
+
+- **Confusion Matrix:** Visualisasi prediksi vs aktual untuk setiap weather_code.
+- **Classification Report:** Precision, Recall, F1-Score per kelas.
+- **Analisis Kelas Imbalanced:** Perhatikan kelas minoritas (code 65: Heavy Rain hanya 585 data).
+
+#### 6.3 Output yang Diharapkan
+
+- Tabel kinerja per parameter.
+- Confusion Matrix (heatmap).
+- Insight: "Model kesulitan membedakan weather_code 61 dan 63" (contoh).
+
+---
+
+### 6.5 Retraining dengan Seluruh Dataset (Final Model)
+
+> **PENTING:** Setelah model terbaik dipilih dari perbandingan, latih ulang dengan **100% data** untuk produksi.
+
+- **Tujuan:** Memaksimalkan performa model final dengan memanfaatkan seluruh data yang tersedia.
 - **Langkah:**
-  - Menampilkan metrik regresi untuk Suhu, Kelembaban, Angin, Tekanan.
-  - Menampilkan metrik klasifikasi untuk Kondisi Cuaca (misal: akurasi prediksi "Hujan" vs "Cerah").
-- **Output yang Diharapkan:** Tabel kinerja per parameter dan Confusion Matrix untuk prediksi cuaca.
+
+  1. Pilih model terbaik dari hasil perbandingan (misal: Random Forest).
+  2. Gabungkan kembali `train_df` dan `test_df` menjadi `full_df`.
+  3. Latih model dengan seluruh data:
+     ```python
+     # Final training dengan 100% data
+     final_regressor = RandomForestRegressor(**best_params)
+     final_regressor.fit(X_full, y_full)
+
+     final_classifier = RandomForestClassifier(**best_params)
+     final_classifier.fit(X_full, y_class_full)
+     ```
+  4. Simpan model final ke file `.pkl`.
+- **Catatan:** Tidak ada evaluasi pada tahap ini karena semua data sudah digunakan untuk training. Evaluasi sudah dilakukan pada tahap 5-6.
 
 ### 7. Penyimpanan Model Terbaik (Single File)
 
@@ -179,12 +258,12 @@ is_rain = 1 if weather_code >= 50 else 0
 - **Tujuan:** Mengatasi masalah "Forecast Horizon" dengan mengimplementasikan fungsi yang dapat memprediksi cuaca untuk rentang waktu di masa depan (misal: 24, 48, atau 72 jam ke depan) berdasarkan data terakhir yang tersedia. Strategi ini memungkinkan pengguna untuk meminta prediksi dari tanggal/jam tertentu ke tanggal/jam di masa depan.
 - **Masalah Model Saat Ini:** Model yang dilatih hanya mampu melakukan prediksi *single-step* (memprediksi 1 jam ke depan). Model seperti `Linear Regression` cenderung hanya meniru nilai dari jam sebelumnya (*persistence model*), yang tidak berguna untuk prediksi jangka panjang.
 - **Strategi yang Diusulkan: Recursive Forecasting**
-  1.  **Model Dasar:** Kita tetap menggunakan model *single-step* yang sudah dilatih.
-  2.  **Proses Iteratif:**
-      - Fungsi prediksi akan menerima input berupa: model yang sudah dilatih, baris data terakhir yang diketahui, dan jangka waktu prediksi (misal: 72 jam).
-      - **Langkah 1 (Prediksi T+1):** Gunakan data terakhir yang diketahui untuk memprediksi cuaca pada jam `T+1`.
-      - **Langkah 2 (Prediksi T+2):** Untuk memprediksi `T+2`, buat baris data baru di mana fitur-fitur lag (`*_lag_1`, `*_lag_24`) dan rolling mean (`*_rolling_mean_24`) diperbarui secara dinamis. Nilai `*_lag_1` akan diisi dari **hasil prediksi pada T+1**.
-      - **Langkah 3 dan Seterusnya:** Ulangi proses ini, di mana setiap prediksi baru digunakan sebagai input untuk prediksi jam berikutnya. Lakukan ini sebanyak jangka waktu prediksi yang diinginkan.
+  1. **Model Dasar:** Kita tetap menggunakan model *single-step* yang sudah dilatih.
+  2. **Proses Iteratif:**
+     - Fungsi prediksi akan menerima input berupa: model yang sudah dilatih, baris data terakhir yang diketahui, dan jangka waktu prediksi (misal: 72 jam).
+     - **Langkah 1 (Prediksi T+1):** Gunakan data terakhir yang diketahui untuk memprediksi cuaca pada jam `T+1`.
+     - **Langkah 2 (Prediksi T+2):** Untuk memprediksi `T+2`, buat baris data baru di mana fitur-fitur lag (`*_lag_1`, `*_lag_24`) dan rolling mean (`*_rolling_mean_24`) diperbarui secara dinamis. Nilai `*_lag_1` akan diisi dari **hasil prediksi pada T+1**.
+     - **Langkah 3 dan Seterusnya:** Ulangi proses ini, di mana setiap prediksi baru digunakan sebagai input untuk prediksi jam berikutnya. Lakukan ini sebanyak jangka waktu prediksi yang diinginkan.
 - **Output yang Diharapkan:**
   - Sebuah DataFrame yang berisi prediksi cuaca untuk setiap jam dalam rentang waktu yang ditentukan.
   - Visualisasi baru yang membandingkan hasil prediksi rekursif dengan data aktual pada *test set*. Ini akan menunjukkan bagaimana performa model menurun seiring waktu (karena akumulasi eror), yang merupakan cerminan kinerja dunia nyata yang lebih baik.
@@ -196,8 +275,8 @@ is_rain = 1 if weather_code >= 50 else 0
   - Pilih satu titik awal dari *test set* (contoh: 1 Januari 2023, jam 00:00).
   - Panggil fungsi prediksi rekursif untuk menghasilkan ramalan cuaca selama 72 jam ke depan dari titik tersebut.
   - Buat 4 grafik garis (untuk Suhu, Kelembaban, Angin, Tekanan), di mana setiap grafik berisi:
-    1.  Garis data **Aktual** dari *test set* selama 72 jam tersebut (sebagai pembanding/benchmark).
-    2.  Garis data **Prediksi Rekursif** yang dihasilkan oleh fungsi.
+    1. Garis data **Aktual** dari *test set* selama 72 jam tersebut (sebagai pembanding/benchmark).
+    2. Garis data **Prediksi Rekursif** yang dihasilkan oleh fungsi.
 - **Visualisasi yang Diharapkan:**
   - Grafik yang menunjukkan garis prediksi (misal: merah putus-putus) mencoba mengikuti garis aktual (misal: biru solid).
   - Grafik ini akan secara jelas menunjukkan degradasi performa seiring berjalannya waktu, memberikan wawasan yang jujur tentang kemampuan prediksi jangka panjang model tersebut.
