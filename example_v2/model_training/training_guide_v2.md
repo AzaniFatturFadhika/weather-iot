@@ -8,12 +8,12 @@ Panduan lengkap untuk melakukan _training_ _dataset_, evaluasi model, dan visual
 
 ## Visualisasi dalam Jurnal dan Kecocokan dengan Kerangka Notebook
 
-| Bagian dalam Kerangka Notebook                         | Tujuan Visualisasi                                                                                  | Visualisasi dalam Jurnal                                        |
-| :----------------------------------------------------- | :-------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------- |
-| **5. Pelatihan dan Perbandingan Model**                | Tabel Perbandingan Metrik (MSE, MAE, RMSE, R²) untuk semua model.                                   | **Tabel 4:** _Performance metrics for different regression models_. |
-| **6. Analisis Hasil dan Kinerja Individual Parameter** | Tabel Evaluasi Kinerja (MAE, RMSE, R²) untuk setiap parameter + Grafik Januari 2022 (gap 2 hari).   | **Tabel 5:** _Performance evaluation of weather parameter predictions_. |
-| **8. Visualisasi Perbandingan Aktual vs. Prediksi**    | Output perbandingan visual Actual vs Predicted untuk Suhu, Kelembaban, Angin, Tekanan.              | **Gambar 15-18:** _Actual vs. Predicted_ per parameter.         |
-| **9. Visualisasi Dampak Data Inkremental**             | Grafik garis peningkatan R² seiring bertambahnya data (_Incremental Learning_).                    | **Gambar 21:** _Impact of incremental data on model performance_. |
+| Bagian dalam Kerangka Notebook                               | Tujuan Visualisasi                                                                                 | Visualisasi dalam Jurnal                                                        |
+| :----------------------------------------------------------- | :------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------ |
+| **5. Pelatihan dan Perbandingan Model**                | Tabel Perbandingan Metrik (MSE, MAE, RMSE, R²) untuk semua model.                                 | **Tabel 4:** _Performance metrics for different regression models_.     |
+| **6. Analisis Hasil dan Kinerja Individual Parameter** | Tabel Evaluasi Kinerja (MAE, RMSE, R²) untuk setiap parameter + Grafik Januari 2022 (gap 2 hari). | **Tabel 5:** _Performance evaluation of weather parameter predictions_. |
+| **8. Visualisasi Perbandingan Aktual vs. Prediksi**    | Output perbandingan visual Actual vs Predicted untuk Suhu, Kelembaban, Angin, Tekanan.             | **Gambar 15-18:** _Actual vs. Predicted_ per parameter.                 |
+| **9. Visualisasi Dampak Data Inkremental**             | Grafik garis peningkatan R² seiring bertambahnya data (_Incremental Learning_).                 | **Gambar 21:** _Impact of incremental data on model performance_.       |
 
 ---
 
@@ -23,33 +23,33 @@ Dataset berisi data cuaca per-jam dari tahun 2000-2024 dengan struktur **23 kolo
 
 ### Kolom Hourly (Per-Jam)
 
-| Kolom                  | Tipe     | Deskripsi                              |
-| ---------------------- | -------- | -------------------------------------- |
-| `id`                   | int      | ID unik                                |
-| `timestamp`            | datetime | Waktu pengukuran (per-jam)             |
-| `hour`, `day`, `month`, `year` | int | Komponen waktu                    |
-| `temp`                 | float    | Suhu (°C)                              |
-| `humidity`             | int      | Kelembaban (%)                         |
-| `windspeed`            | float    | Kecepatan angin (km/h)                 |
-| `sealevelpressure`     | float    | Tekanan permukaan laut (hPa)           |
-| `rain`                 | float    | Curah hujan (mm)                       |
-| `precipitation`        | float    | Presipitasi (mm) - identik dengan rain |
-| `apparent_temperature` | float    | Suhu yang dirasakan (°C)               |
-| `surface_pressure`     | float    | Tekanan permukaan (hPa)                |
-| `weather_code`         | int      | Kode cuaca (0-65)                      |
-| `conditions`           | string   | Kondisi cuaca (teks)                   |
+| Kolom                                  | Tipe     | Deskripsi                              |
+| -------------------------------------- | -------- | -------------------------------------- |
+| `id`                                 | int      | ID unik                                |
+| `timestamp`                          | datetime | Waktu pengukuran (per-jam)             |
+| `hour`, `day`, `month`, `year` | int      | Komponen waktu                         |
+| `temp`                               | float    | Suhu (°C)                             |
+| `humidity`                           | int      | Kelembaban (%)                         |
+| `windspeed`                          | float    | Kecepatan angin (km/h)                 |
+| `sealevelpressure`                   | float    | Tekanan permukaan laut (hPa)           |
+| `rain`                               | float    | Curah hujan (mm)                       |
+| `precipitation`                      | float    | Presipitasi (mm) - identik dengan rain |
+| `apparent_temperature`               | float    | Suhu yang dirasakan (°C)              |
+| `surface_pressure`                   | float    | Tekanan permukaan (hPa)                |
+| `weather_code`                       | int      | Kode cuaca (0-65)                      |
+| `conditions`                         | string   | Kondisi cuaca (teks)                   |
 
 ### Kolom Daily (Per-Hari)
 
-| Kolom                  | Tipe  | Deskripsi                               |
-| ---------------------- | ----- | --------------------------------------- |
-| `temp_max_daily`       | float | Suhu maksimum harian (°C)               |
-| `temp_min_daily`       | float | Suhu minimum harian (°C)                |
-| `weather_code_daily`   | int   | Kode cuaca dominan harian               |
-| `temp_mean_daily`      | float | Suhu rata-rata harian (°C)              |
-| `humidity_avg_daily`   | int   | Kelembaban rata-rata harian (%)         |
-| `pressure_avg_daily`   | float | Tekanan rata-rata harian (hPa)          |
-| `windspeed_avg_daily`  | float | Kecepatan angin rata-rata harian (km/h) |
+| Kolom                   | Tipe  | Deskripsi                               |
+| ----------------------- | ----- | --------------------------------------- |
+| `temp_max_daily`      | float | Suhu maksimum harian (°C)              |
+| `temp_min_daily`      | float | Suhu minimum harian (°C)               |
+| `weather_code_daily`  | int   | Kode cuaca dominan harian               |
+| `temp_mean_daily`     | float | Suhu rata-rata harian (°C)             |
+| `humidity_avg_daily`  | int   | Kelembaban rata-rata harian (%)         |
+| `pressure_avg_daily`  | float | Tekanan rata-rata harian (hPa)          |
+| `windspeed_avg_daily` | float | Kecepatan angin rata-rata harian (km/h) |
 
 > **Catatan:** Kolom daily (`*_daily`) memiliki nilai yang sama untuk semua baris dalam satu hari yang sama.
 
@@ -149,16 +149,16 @@ df.head()
 
 | Weather Code | Kondisi (conditions)   | Rain Mean (mm) | Rain Range (mm) | Jumlah Data |
 | :----------: | ---------------------- | :------------: | :-------------: | :---------: |
-|      0       | Clear                  |      0.00      |       0.0       |   23,298    |
-|      1       | Partially cloudy       |      0.00      |       0.0       |   28,622    |
-|      2       | Partially cloudy       |      0.00      |       0.0       |   26,366    |
-|      3       | Overcast               |      0.00      |       0.0       |   81,994    |
-|      51      | Rain (Light)           |      0.21      |    0.1 - 0.4    |   37,108    |
-|      53      | Rain (Moderate)        |      0.66      |    0.5 - 0.9    |   12,421    |
+|      0      | Clear                  |      0.00      |       0.0       |   23,298   |
+|      1      | Partially cloudy       |      0.00      |       0.0       |   28,622   |
+|      2      | Partially cloudy       |      0.00      |       0.0       |   26,366   |
+|      3      | Overcast               |      0.00      |       0.0       |   81,994   |
+|      51      | Rain (Light)           |      0.21      |    0.1 - 0.4    |   37,108   |
+|      53      | Rain (Moderate)        |      0.66      |    0.5 - 0.9    |   12,421   |
 |      55      | Rain (Heavy Showers)   |      1.09      |    1.0 - 1.2    |    3,785    |
 |      61      | Rain, Overcast         |      1.74      |    1.3 - 2.4    |    7,333    |
 |      63      | Rain, Overcast         |      3.95      |    2.5 - 7.5    |    5,792    |
-|      65      | Rain, Overcast (Heavy) |     10.28      |   7.6 - 33.4    |     585     |
+|      65      | Rain, Overcast (Heavy) |     10.28     |   7.6 - 33.4   |     585     |
 
 #### Kesimpulan Korelasi
 
@@ -248,7 +248,7 @@ for col in hourly_target_cols:
     # [v2.0] Tambahan Rolling pendek untuk menangkap tren cepat
     df_hourly[f'{col}_rolling_3'] = df_hourly[col].rolling(window=3).mean()
     df_hourly[f'{col}_rolling_6'] = df_hourly[col].rolling(window=6).mean()
-    
+  
     # [v2.0] Rolling std untuk variabilitas
     df_hourly[f'{col}_rolling_std_24'] = df_hourly[col].rolling(window=24).std()
 
@@ -318,15 +318,16 @@ df_daily = df_daily.dropna().reset_index(drop=True)
 
 - **Tujuan:** Membandingkan berbagai algoritma untuk memilih model terbaik untuk:
   - **Model Hourly**: Prediksi per-jam (temp, humidity, windspeed, pressure, weather_code)
-  - **Model Daily**: Prediksi per-hari (temp_min, temp_max, temp_mean, humidity_avg, windspeed_avg, pressure_avg, weather_code_dominant). **Rekomendasi:** Gunakan model terpisah untuk setiap target daily (misal: 1 model khusus `temp_max`, 1 model khusus `pressure_avg`) untuk akurasi lebih tinggi dibanding single multi-output model.
+  - **Model Daily**: Prediksi per-hari (temp_min, temp_max, temp_mean, humidity_avg, windspeed_avg, pressure_avg, weather_code_dominant).
+  - **Rekomendasi:** Gunakan model terpisah untuk setiap target daily (misal: 1 model khusus `temp_max`, 1 model khusus `pressure_avg`) untuk akurasi lebih tinggi dibanding single multi-output model.
 
 ### 5.0 Strategi Modeling Lanjutan (Expert Tips)
 
 1. **Hourly Regression (Residual Learning):**
    Data per jam sangat fluktuatif. Alih-alih memprediksi nilai absolut (misal 30°C), coba prediksi **perubahan** dari jam sebelumnya.
-   *   Target Baru = `Temp(t) - Temp(t-1)`
-   *   Ini membantu model fokus pada dinamika perubahan cuaca.
 
+   * Target Baru = `Temp(t) - Temp(t-1)`
+   * Ini membantu model fokus pada dinamika perubahan cuaca.
 2. **Hourly Classification:**
    Gunakan `class_weight='balanced'` atau `SelectFromModel` untuk menangani ketidakseimbangan kelas ekstrim pada `weather_code` (hujan deras jarang terjadi).
 
@@ -348,18 +349,18 @@ tscv = TimeSeriesSplit(n_splits=5)
 def evaluate_with_cv(model, X, y, cv=tscv):
     """Evaluasi model dengan Time Series Cross-Validation"""
     scores = {'r2': [], 'rmse': [], 'mae': []}
-    
+  
     for train_idx, test_idx in cv.split(X):
         X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
         y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
-        
+      
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
-        
+      
         scores['r2'].append(r2_score(y_test, y_pred))
         scores['rmse'].append(np.sqrt(mean_squared_error(y_test, y_pred)))
         scores['mae'].append(mean_absolute_error(y_test, y_pred))
-    
+  
     return {
         'R2_mean': np.mean(scores['r2']),
         'R2_std': np.std(scores['r2']),
@@ -477,7 +478,7 @@ xgb_clf = XGBClassifier(
 
 ## 6. Analisis Hasil dan Kinerja Individual Parameter
 
-- **Tujuan:** Evaluasi mendalam model terbaik untuk setiap parameter secara individual.
+- **Tujuan:** Evaluasi mendalam model terbaik untuk setiap parameter secara individual. (Model terbaik jatuh pada Logistic Regression dan Linear Regression, gunakan kedua model tersebut untuk klasifikasi dan regresi pada notebook)
 - **Periode Analisis:** **Januari 2022** (1 bulan penuh)
 - **Format Visualisasi:** Grafik time-series dengan **gap 2 hari** untuk kejelasan
 
@@ -485,12 +486,12 @@ xgb_clf = XGBClassifier(
 
 Menampilkan metrik terpisah untuk setiap target:
 
-| Parameter        | MAE   | RMSE  | R²    | Keterangan                       |
-| ---------------- | ----- | ----- | ----- | -------------------------------- |
-| Temperature      | -     | -     | -     | Target utama                     |
-| Humidity         | -     | -     | -     | -                                |
-| Wind Speed       | -     | -     | -     | Biasanya paling sulit diprediksi |
-| Pressure         | -     | -     | -     | Relatif stabil                   |
+| Parameter   | MAE | RMSE | R² | Keterangan                       |
+| ----------- | --- | ---- | --- | -------------------------------- |
+| Temperature | -   | -    | -   | Target utama                     |
+| Humidity    | -   | -    | -   | -                                |
+| Wind Speed  | -   | -    | -   | Biasanya paling sulit diprediksi |
+| Pressure    | -   | -    | -   | Relatif stabil                   |
 
 ### 6.2 Visualisasi Time-Series: Actual vs Predicted (Januari 2022)
 
@@ -535,7 +536,7 @@ for ax, (actual_col, pred_col, title, color) in zip(axes, params):
             '-o', color=color, label='Aktual', linewidth=2, markersize=6)
     ax.plot(df_jan_2d['timestamp'], df_jan_2d[pred_col], 
             '--s', color=color, alpha=0.6, label='Prediksi', linewidth=2, markersize=6)
-    
+  
     ax.set_title(f'{title} - Januari 2022 (Gap 2 Hari)', fontsize=12, fontweight='bold')
     ax.set_xlabel('Tanggal')
     ax.set_ylabel(title)
@@ -596,14 +597,15 @@ print(classification_report(y_jan_clf_actual, y_jan_clf_pred,
 
 ### 6.4 Output yang Diharapkan
 
-| Output               | Deskripsi                                       |
-| -------------------- | ----------------------------------------------- |
-| Tabel Metrik         | MAE, RMSE, R² per parameter                     |
-| Grafik Time-Series   | 4 subplot Actual vs Predicted (gap 2 hari)      |
-| Confusion Matrix     | Heatmap klasifikasi weather_code                |
-| Classification Report| Precision, Recall, F1-Score per kelas           |
+| Output                | Deskripsi                                  |
+| --------------------- | ------------------------------------------ |
+| Tabel Metrik          | MAE, RMSE, R² per parameter               |
+| Grafik Time-Series    | 4 subplot Actual vs Predicted (gap 2 hari) |
+| Confusion Matrix      | Heatmap klasifikasi weather_code           |
+| Classification Report | Precision, Recall, F1-Score per kelas      |
 
 **Insight Contoh:**
+
 - "Temperature prediction sangat akurat (R² > 0.95)"
 - "Wind Speed paling sulit diprediksi (R² ~ 0.7)"
 - "Model kesulitan membedakan weather_code 61 dan 63"
@@ -829,25 +831,25 @@ rain_map = model_package['weather_code_to_rain']
 class WeatherPredictor:
     def __init__(self, model_path: str):
         self.package = joblib.load(model_path)
-        
+      
         # Hourly models
         self.hourly_reg = self.package['hourly']['regressor']
         self.hourly_clf = self.package['hourly']['classifier']
         self.hourly_features = self.package['hourly']['feature_columns']
-        
+      
         # Daily models
         self.daily_reg = self.package['daily']['regressor']
         self.daily_clf = self.package['daily']['classifier']
         self.daily_features = self.package['daily']['feature_columns']
-        
+      
         # Metadata
         self.rain_map = self.package['weather_code_to_rain']
-    
+  
     def predict_hourly(self, features: dict) -> dict:
         X = self._prepare_features(features, self.hourly_features)
         reg_pred = self.hourly_reg.predict(X)[0]
         weather_code = self.hourly_clf.predict(X)[0]
-        
+      
         return {
             'temp': reg_pred[0],
             'humidity': reg_pred[1],
@@ -856,12 +858,12 @@ class WeatherPredictor:
             'weather_code': int(weather_code),
             'rain': self.rain_map.get(int(weather_code), 0)
         }
-    
+  
     def predict_daily(self, features: dict) -> dict:
         X = self._prepare_features(features, self.daily_features)
         reg_pred = self.daily_reg.predict(X)[0]
         weather_code = self.daily_clf.predict(X)[0]
-        
+      
         return {
             'temp_min': reg_pred[0],
             'temp_max': reg_pred[1],
@@ -886,47 +888,47 @@ class WeatherPredictor:
 def recursive_forecast_hourly(model_reg, model_clf, history_data, feature_cols, n_hours=24):
     """
     Prediksi cuaca secara rekursif untuk n_hours ke depan dengan recalculation fitur.
-    
+  
     Args:
         history_data: DataFrame berisi data historis (min. 24 jam terakhir)
     """
     prediction_results = []
     # Copy data agar tidak mengubah aslinya
     current_history = history_data.copy()
-    
+  
     for i in range(n_hours):
         # 1. Recalculate Features on the fly (PENTING untuk Rolling Features)
         # Kita perlu menghitung ulang rolling mean/std berdasarkan data terbaru (+ prediksi sebelumnya)
         # Hitung fitur untuk row terakhir saja
         last_idx = current_history.index[-1]
-        
+      
         # Temp calculation df (ambil data secukupnya untuk rolling window terbesar, misal 48 jam)
         calc_df = current_history.tail(48).copy()
-        
+      
         # Recalculate lag & rolling features manual atau panggil fungsi feature engineering
         # Disini kita simulasikan update manual untuk fitur kunci
         calc_df['temp_rolling_3'] = calc_df['temp'].rolling(window=3).mean()
         calc_df['temp_rolling_6'] = calc_df['temp'].rolling(window=6).mean()
         calc_df['temp_rolling_24'] = calc_df['temp'].rolling(window=24).mean()
-        
+      
         calc_df['humidity_rolling_3'] = calc_df['humidity'].rolling(window=3).mean()
         calc_df['humidity_rolling_6'] = calc_df['humidity'].rolling(window=6).mean()
         calc_df['humidity_rolling_24'] = calc_df['humidity'].rolling(window=24).mean()
-        
+      
         # ... lakukan untuk feature lain ...
         # (Dalam implementasi produksi, buat fungsi `calculate_features(df)` terpisah)
-        
+      
         # Ambil fitur untuk prediksi (row terakhir)
         X_test = calc_df.iloc[[-1]][feature_cols]
-        
+      
         # 2. Prediksi
         reg_pred = model_reg.predict(X_test)[0]   # [temp, humid, wind, press]
         clf_pred = model_clf.predict(X_test)[0]   # weather_code
-        
+      
         # 3. Simpan Hasil
         next_timestamp = current_history['timestamp'].iloc[-1] + pd.Timedelta(hours=1)
         next_hour = next_timestamp.hour
-        
+      
         pred_dict = {
             'timestamp': next_timestamp,
             'hour': next_hour,
@@ -942,14 +944,14 @@ def recursive_forecast_hourly(model_reg, model_clf, history_data, feature_cols, 
             'hour_sin': np.sin(2 * np.pi * next_hour / 24),
             'hour_cos': np.cos(2 * np.pi * next_hour / 24)
         }
-        
+      
         prediction_results.append(pred_dict)
-        
+      
         # 4. Append prediksi ke current_history untuk iterasi berikutnya
         # Convert dict ke DataFrame dan gabung
         next_row = pd.DataFrame([pred_dict])
         current_history = pd.concat([current_history, next_row], ignore_index=True)
-        
+      
     return pd.DataFrame(prediction_results)
 ```
 
@@ -1023,14 +1025,14 @@ for frac in fractions:
     n_samples = int(len(X_hourly_train) * frac)
     X_subset = X_hourly_train.iloc[:n_samples]
     y_subset = y_hourly_train_reg.iloc[:n_samples]
-    
+  
     temp_model = RandomForestRegressor(n_estimators=50, random_state=42, n_jobs=-1)
     temp_model.fit(X_subset, y_subset)
-    
+  
     y_pred = temp_model.predict(X_hourly_test)
     r2 = r2_score(y_hourly_test_reg, y_pred)
     r2_scores.append(r2)
-    
+  
     print(f"   {int(frac*100):3d}% data ({n_samples:,} samples): R² = {r2:.4f}")
 
 # Plot hasil
@@ -1083,15 +1085,15 @@ model.plot_components(forecast)
 
 ## Rangkuman Perubahan v2.0
 
-| No | Fitur Baru                     | Dampak                                      |
-| -- | ------------------------------ | ------------------------------------------- |
-| 1  | Cyclical Time Features         | Model memahami siklus temporal              |
-| 2  | Dew Point Feature              | Indikator kuat untuk prediksi hujan         |
-| 3  | Class Balancing                | Akurasi kelas minoritas naik signifikan     |
-| 4  | Expanding Window CV            | Validasi lebih robust dan jujur             |
-| 5  | Rolling 3d/7d untuk Daily      | Model non-linear dapat menangkap trend      |
-| 6  | Visualisasi Januari 2022       | Analisis detail per-bulan dengan gap 2 hari |
-| 7  | Prophet (opsional)             | Seasonality detection lebih baik            |
+| No | Fitur Baru                | Dampak                                      |
+| -- | ------------------------- | ------------------------------------------- |
+| 1  | Cyclical Time Features    | Model memahami siklus temporal              |
+| 2  | Dew Point Feature         | Indikator kuat untuk prediksi hujan         |
+| 3  | Class Balancing           | Akurasi kelas minoritas naik signifikan     |
+| 4  | Expanding Window CV       | Validasi lebih robust dan jujur             |
+| 5  | Rolling 3d/7d untuk Daily | Model non-linear dapat menangkap trend      |
+| 6  | Visualisasi Januari 2022  | Analisis detail per-bulan dengan gap 2 hari |
+| 7  | Prophet (opsional)        | Seasonality detection lebih baik            |
 
 ---
 
