@@ -12,16 +12,44 @@ Berikut adalah kerangka urutan/struktur _notebook_ `ipynb` untuk melakukan _trai
 | **8. Visualisasi Perbandingan Aktual vs. Prediksi**    | Output perbandingan visual*Actual vs Predicted* untuk semua fitur yang diprediksi Tekanan.                                 | **Gambar 18:** _Actual vs. Predicted pressure_.                         |
 | **9. Visualisasi Dampak Data Inkremental**             | Grafik garis yang menunjukkan peningkatan skor$R^2$ seiring bertambahnya jumlah _data points_ (_Incremental Learning_). | **Gambar 21:** _Impact of incremental data on model performance_.       |
 
-Dataset:
-id	timestamp	hour	day	month	year	temp	humidity	windspeed	sealevelpressure	rain	precipitation	apparent_temperature	surface_pressure	weather_code	conditions	temp_max_daily	temp_min_daily	weather_code_daily	temp_mean_daily
-0	2000-01-01 00:00:00	0	1	1	2000	21.8	98	4.0	1008.4	0.0	0.0	25.9	984.5	3	Overcast	27.5	20.8	53	24.1
-1	2000-01-01 01:00:00	1	1	1	2000	21.4	99	4.0	1007.9	0.0	0.0	25.3	983.9	3	Overcast	27.5	20.8	53	24.1
-2	2000-01-01 02:00:00	2	1	1	2000	21.4	98	3.2	1007.4	0.0	0.0	25.4	983.4	3	Overcast	27.5	20.8	53	24.1
-3	2000-01-01 03:00:00	3	1	1	2000	21.2	99	4.6	1007.0	0.0	0.0	24.9	983.0	3	Overcast	27.5	20.8	53	24.1
-4	2000-01-01 04:00:00	4	1	1	2000	21.0	99	3.6	1006.9	0.0	0.0	24.7	982.9	3	Overcast	27.5	20.8	53	24.1
-5	2000-01-01 05:00:00	5	1	1	2000	20.8	98	2.7	1006.6	0.0	0.0	24.5	982.6	3	Overcast	27.5	20.8	53	24.1
+### Sample Dataset
 
-Regression
+Dataset berisi data cuaca per-jam dari tahun 2000-2024 dengan struktur kolom sebagai berikut:
+
+| Kolom | Tipe | Deskripsi |
+|-------|------|-----------|
+| `id` | int | ID unik |
+| `timestamp` | datetime | Waktu pengukuran (per-jam) |
+| `hour`, `day`, `month`, `year` | int | Komponen waktu |
+| `temp` | float | Suhu (°C) |
+| `humidity` | int | Kelembaban (%) |
+| `windspeed` | float | Kecepatan angin (km/h) |
+| `sealevelpressure` | float | Tekanan permukaan laut (hPa) |
+| `rain` | float | Curah hujan (mm) |
+| `precipitation` | float | Presipitasi (mm) - identik dengan rain |
+| `apparent_temperature` | float | Suhu yang dirasakan (°C) |
+| `surface_pressure` | float | Tekanan permukaan (hPa) |
+| `weather_code` | int | Kode cuaca (0-65) |
+| `conditions` | string | Kondisi cuaca (teks) |
+| `temp_max_daily` | float | Suhu maksimum harian (°C) |
+| `temp_min_daily` | float | Suhu minimum harian (°C) |
+| `weather_code_daily` | int | Kode cuaca harian |
+| `temp_mean_daily` | float | Suhu rata-rata harian (°C) |
+
+**Contoh Data (6 baris pertama):**
+
+| id | timestamp | hour | day | month | year | temp | humidity | windspeed | weather_code | conditions |
+|----|-----------|------|-----|-------|------|------|----------|-----------|--------------|------------|
+| 0 | 2000-01-01 00:00:00 | 0 | 1 | 1 | 2000 | 21.8 | 98 | 4.0 | 3 | Overcast |
+| 1 | 2000-01-01 01:00:00 | 1 | 1 | 1 | 2000 | 21.4 | 99 | 4.0 | 3 | Overcast |
+| 2 | 2000-01-01 02:00:00 | 2 | 1 | 1 | 2000 | 21.4 | 98 | 3.2 | 3 | Overcast |
+| 3 | 2000-01-01 03:00:00 | 3 | 1 | 1 | 2000 | 21.2 | 99 | 4.6 | 3 | Overcast |
+| 4 | 2000-01-01 04:00:00 | 4 | 1 | 1 | 2000 | 21.0 | 99 | 3.6 | 3 | Overcast |
+| 5 | 2000-01-01 05:00:00 | 5 | 1 | 1 | 2000 | 20.8 | 98 | 2.7 | 3 | Overcast |
+
+---
+
+## Tipe Model: Regression & Classification
 
 ## Kerangka Struktur Notebook (`.ipynb`) untuk Pelatihan Model Prediksi Cuaca (Diperbarui)
 
@@ -47,10 +75,50 @@ Regression
   - **Visualisasi Distribusi:** Membuat histogram atau plot kepadatan untuk setiap parameter cuaca (suhu, kelembaban, dll.) untuk melihat distribusinya.
   - **Analisis Korelasi:** Menghasilkan heatmap korelasi untuk memahami hubungan antar variabel, terutama hubungan rain dengan weather_code dan conditions.
   - **Analisis Deret Waktu:** Membuat plot garis dari setiap parameter cuaca terhadap waktu untuk mengidentifikasi tren, musiman, atau anomali.
+  - **Analisis Korelasi weather_code, conditions, dan rain/precipitation:** (Lihat sub-bagian 3.1)
 - **Output yang Diharapkan:**
   - Tabel statistik deskriptif.
   - Serangkaian plot (histogram, heatmap, plot garis deret waktu).
   - Wawasan awal tentang data, seperti "suhu menunjukkan pola musiman yang jelas" atau "kelembaban dan curah hujan berkorelasi positif."
+
+#### 3.1 Analisis Korelasi: weather_code, conditions, dan rain/precipitation
+
+**Temuan Kritis:** Terdapat hubungan **deterministik** (bukan probabilistik) antara `weather_code`, `conditions`, dan nilai `rain`/`precipitation`.
+
+##### Tabel Mapping Weather Code ke Rain
+
+| Weather Code | Kondisi (conditions) | Rain Mean (mm) | Rain Range (mm) | Jumlah Data |
+|:------------:|----------------------|:--------------:|:---------------:|:-----------:|
+| 0 | Clear | 0.00 | 0.0 | 23,298 |
+| 1 | Partially cloudy | 0.00 | 0.0 | 28,622 |
+| 2 | Partially cloudy | 0.00 | 0.0 | 26,366 |
+| 3 | Overcast | 0.00 | 0.0 | 81,994 |
+| 51 | Rain (Light) | 0.21 | 0.1 - 0.4 | 37,108 |
+| 53 | Rain (Moderate) | 0.66 | 0.5 - 0.9 | 12,421 |
+| 55 | Rain (Heavy Showers) | 1.09 | 1.0 - 1.2 | 3,785 |
+| 61 | Rain, Overcast | 1.74 | 1.3 - 2.4 | 7,333 |
+| 63 | Rain, Overcast | 3.95 | 2.5 - 7.5 | 5,792 |
+| 65 | Rain, Overcast (Heavy) | 10.28 | 7.6 - 33.4 | 585 |
+
+##### Kesimpulan Korelasi
+
+1. **rain = precipitation**: Nilai keduanya **identik** di seluruh dataset.
+2. **weather_code → rain**: Korelasi deterministik. Kode ≥ 50 **selalu** memiliki nilai rain > 0.
+3. **conditions → rain**: Konsisten. Kondisi yang mengandung "Rain" selalu memiliki nilai rain > 0.
+
+##### Implikasi untuk Model
+
+> **PENTING:** Karena hubungan deterministik ini, **tidak perlu memprediksi `rain` secara terpisah**. Cukup prediksi `weather_code`, lalu derive nilai rain menggunakan mapping:
+
+```python
+rain_map = {0:0, 1:0, 2:0, 3:0, 51:0.2, 53:0.7, 55:1.1, 61:1.7, 63:4.0, 65:10.3}
+predicted_rain = rain_map[predicted_weather_code]
+```
+
+Untuk klasifikasi hujan biner (hujan/tidak hujan):
+```python
+is_rain = 1 if weather_code >= 50 else 0
+```
 
 ### 4\. Pra-pemrosesan Data dan Feature Engineering (PENTING)
 
