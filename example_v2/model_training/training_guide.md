@@ -24,7 +24,7 @@ Berikut adalah kerangka urutan/struktur _notebook_ `ipynb` untuk melakukan _trai
 
 - **Tujuan:** Memuat _dataset_ historis gabungan.
 - **Langkah:**
-  - Memuat data historis [historical_data_hourly.csv](..\data_collections\datasets\historical_data_hourly.csv).
+  - Memuat data historis [historical_data.csv](..\data_collections\datasets\historical_data_2000_2024.csv).
   - Mengurutkan data berdasarkan waktu (`timestamp`) untuk memastikan urutan kronologis yang benar.
 - **Output yang Diharapkan:** Tampilan beberapa baris pertama _dataset_ dan info struktur data.
 
@@ -52,13 +52,13 @@ Berikut adalah kerangka urutan/struktur _notebook_ `ipynb` untuk melakukan _trai
       2. **K-Neighbors Regressor**
       3. **Decision Tree Regressor**
       4. **Random Forest Regressor**
-    - **Evaluasi:** Bandingkan MSE, MAE, RMSE, dan $R^{2}$. Pilih yang terbaik (biasanya Random Forest).
+    - **Evaluasi:** Bandingkan semua parameter performa seperti MSE, MAE, RMSE, dan $R^{2}$. Pilih yang terbaik (biasanya Random Forest).
   - **Komparasi Klasifikasi (Target: weather_code):**
     - Melatih dan membandingkan minimal 3 algoritma, contohnya:
       1. **Logistic Regression**
       2. **Decision Tree Classifier**
       3. **Random Forest Classifier**
-    - **Evaluasi:** Bandingkan Accuracy, F1-Score. Pilih yang terbaik.
+    - **Evaluasi:** Bandingkan semua parameter performa seperti Accuracy, F1-Score. Pilih yang terbaik.
 - **Output yang Diharapkan:**
   - Tabel perbandingan metrik untuk 4 algoritma Regresi.
   - Tabel perbandingan metrik untuk 3 algoritma Klasifikasi.
@@ -82,9 +82,9 @@ Berikut adalah kerangka urutan/struktur _notebook_ `ipynb` untuk melakukan _trai
 
 ### 7. Visualisasi Perbandingan Aktual vs. Prediksi
 
-- **Tujuan:** Memvisualisasikan performa model pada data uji (Januari 2020).
+- **Tujuan:** Memvisualisasikan performa model pada data uji (Januari 2023).
 - **Langkah:**
-  - Mengambil data Januari 2020.
+  - Mengambil data Januari 2023.
   - Melakukan prediksi menggunakan fitur lag yang telah dibuat.
   - Agregasi ke level Harian (Daily Mean) untuk plot yang lebih bersih.
 - **Visualisasi yang Diharapkan:** 4 Grafik garis (Suhu, Kelembaban, Angin, Tekanan) di mana garis Prediksi (Merah Putus-putus) mengikuti garis Aktual (Biru) dengan sangat dekat.
