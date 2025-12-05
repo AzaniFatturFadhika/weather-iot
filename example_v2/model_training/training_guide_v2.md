@@ -229,7 +229,8 @@ df_hourly['doy_cos'] = np.cos(2 * np.pi * df_hourly['day_of_year'] / 365)
 df_hourly['dew_point'] = df_hourly['temp'] - ((100 - df_hourly['humidity']) / 5)
 
 # Temperature Range (untuk daily) - rentang kecil = mendung/hujan
-df_hourly['temp_range'] = df_hourly['temp_max_daily'] - df_hourly['temp_min_daily']
+# [FIXED] Gunakan shift(24) agar tidak bocor data masa depan (karena daily max/min baru tau besoknya)
+df_hourly['temp_range'] = df_hourly['temp_max_daily'].shift(24) - df_hourly['temp_min_daily'].shift(24)
 
 # Humidity-Temperature Interaction
 df_hourly['humid_temp_ratio'] = df_hourly['humidity'] / (df_hourly['temp'] + 1)
@@ -244,6 +245,10 @@ for col in hourly_target_cols:
     df_hourly[f'{col}_lag_1'] = df_hourly[col].shift(1)
     df_hourly[f'{col}_lag_24'] = df_hourly[col].shift(24)
     df_hourly[f'{col}_rolling_24'] = df_hourly[col].rolling(window=24).mean()
+    # [v2.0] Tambahan Rolling pendek untuk menangkap tren cepat
+    df_hourly[f'{col}_rolling_3'] = df_hourly[col].rolling(window=3).mean()
+    df_hourly[f'{col}_rolling_6'] = df_hourly[col].rolling(window=6).mean()
+    
     # [v2.0] Rolling std untuk variabilitas
     df_hourly[f'{col}_rolling_std_24'] = df_hourly[col].rolling(window=24).std()
 
@@ -313,7 +318,17 @@ df_daily = df_daily.dropna().reset_index(drop=True)
 
 - **Tujuan:** Membandingkan berbagai algoritma untuk memilih model terbaik untuk:
   - **Model Hourly**: Prediksi per-jam (temp, humidity, windspeed, pressure, weather_code)
-  - **Model Daily**: Prediksi per-hari (temp_min, temp_max, temp_mean, humidity_avg, windspeed_avg, pressure_avg, weather_code_dominant)
+  - **Model Daily**: Prediksi per-hari (temp_min, temp_max, temp_mean, humidity_avg, windspeed_avg, pressure_avg, weather_code_dominant). **Rekomendasi:** Gunakan model terpisah untuk setiap target daily (misal: 1 model khusus `temp_max`, 1 model khusus `pressure_avg`) untuk akurasi lebih tinggi dibanding single multi-output model.
+
+### 5.0 Strategi Modeling Lanjutan (Expert Tips)
+
+1. **Hourly Regression (Residual Learning):**
+   Data per jam sangat fluktuatif. Alih-alih memprediksi nilai absolut (misal 30°C), coba prediksi **perubahan** dari jam sebelumnya.
+   *   Target Baru = `Temp(t) - Temp(t-1)`
+   *   Ini membantu model fokus pada dinamika perubahan cuaca.
+
+2. **Hourly Classification:**
+   Gunakan `class_weight='balanced'` atau `SelectFromModel` untuk menangani ketidakseimbangan kelas ekstrim pada `weather_code` (hujan deras jarang terjadi).
 
 ### 5.1 [v2.0] Expanding Window Cross-Validation (BARU)
 
@@ -373,11 +388,11 @@ daily_test = df_daily[daily_train_size:]
 # [v2.0] HOURLY Features dengan cyclical dan interaction
 hourly_feature_cols = [
     'hour_sin', 'hour_cos', 'month_sin', 'month_cos',  # Cyclical
-    'temp_lag_1', 'temp_lag_24', 'temp_rolling_24',
-    'humidity_lag_1', 'humidity_lag_24', 'humidity_rolling_24',
-    'windspeed_lag_1', 'windspeed_lag_24', 'windspeed_rolling_24',
-    'sealevelpressure_lag_1', 'sealevelpressure_lag_24', 'sealevelpressure_rolling_24',
-    'dew_point', 'humid_temp_ratio'  # Interaction
+    'temp_lag_1', 'temp_lag_24', 'temp_rolling_24', 'temp_rolling_3', 'temp_rolling_6',
+    'humidity_lag_1', 'humidity_lag_24', 'humidity_rolling_24', 'humidity_rolling_3', 'humidity_rolling_6',
+    'windspeed_lag_1', 'windspeed_lag_24', 'windspeed_rolling_24', 'windspeed_rolling_3', 'windspeed_rolling_6',
+    'sealevelpressure_lag_1', 'sealevelpressure_lag_24', 'sealevelpressure_rolling_24', 'sealevelpressure_rolling_3', 'sealevelpressure_rolling_6',
+    'dew_point', 'humid_temp_ratio', 'temp_range'  # Interaction
 ]
 hourly_target_reg = ['temp', 'humidity', 'windspeed', 'sealevelpressure']
 hourly_target_clf = 'weather_code_encoded'
@@ -868,48 +883,74 @@ class WeatherPredictor:
 - **Strategi: Recursive Forecasting**
 
 ```python
-def recursive_forecast_hourly(model_reg, model_clf, last_known_data, feature_cols, n_hours=24):
+def recursive_forecast_hourly(model_reg, model_clf, history_data, feature_cols, n_hours=24):
     """
-    Prediksi cuaca secara rekursif untuk n_hours ke depan.
+    Prediksi cuaca secara rekursif untuk n_hours ke depan dengan recalculation fitur.
     
     Args:
-        model_reg: Model regresi yang sudah dilatih
-        model_clf: Model klasifikasi yang sudah dilatih
-        last_known_data: DataFrame dengan data terakhir yang diketahui
-        feature_cols: List kolom fitur
-        n_hours: Jumlah jam ke depan untuk diprediksi
-    
-    Returns:
-        DataFrame dengan prediksi untuk n_hours ke depan
+        history_data: DataFrame berisi data historis (min. 24 jam terakhir)
     """
-    predictions = []
-    current_data = last_known_data.copy()
+    prediction_results = []
+    # Copy data agar tidak mengubah aslinya
+    current_history = history_data.copy()
     
     for i in range(n_hours):
-        X = current_data[feature_cols].values.reshape(1, -1)
+        # 1. Recalculate Features on the fly (PENTING untuk Rolling Features)
+        # Kita perlu menghitung ulang rolling mean/std berdasarkan data terbaru (+ prediksi sebelumnya)
+        # Hitung fitur untuk row terakhir saja
+        last_idx = current_history.index[-1]
         
-        # Prediksi
-        reg_pred = model_reg.predict(X)[0]
-        clf_pred = model_clf.predict(X)[0]
+        # Temp calculation df (ambil data secukupnya untuk rolling window terbesar, misal 48 jam)
+        calc_df = current_history.tail(48).copy()
+        
+        # Recalculate lag & rolling features manual atau panggil fungsi feature engineering
+        # Disini kita simulasikan update manual untuk fitur kunci
+        calc_df['temp_rolling_3'] = calc_df['temp'].rolling(window=3).mean()
+        calc_df['temp_rolling_6'] = calc_df['temp'].rolling(window=6).mean()
+        calc_df['temp_rolling_24'] = calc_df['temp'].rolling(window=24).mean()
+        
+        calc_df['humidity_rolling_3'] = calc_df['humidity'].rolling(window=3).mean()
+        calc_df['humidity_rolling_6'] = calc_df['humidity'].rolling(window=6).mean()
+        calc_df['humidity_rolling_24'] = calc_df['humidity'].rolling(window=24).mean()
+        
+        # ... lakukan untuk feature lain ...
+        # (Dalam implementasi produksi, buat fungsi `calculate_features(df)` terpisah)
+        
+        # Ambil fitur untuk prediksi (row terakhir)
+        X_test = calc_df.iloc[[-1]][feature_cols]
+        
+        # 2. Prediksi
+        reg_pred = model_reg.predict(X_test)[0]   # [temp, humid, wind, press]
+        clf_pred = model_clf.predict(X_test)[0]   # weather_code
+        
+        # 3. Simpan Hasil
+        next_timestamp = current_history['timestamp'].iloc[-1] + pd.Timedelta(hours=1)
+        next_hour = next_timestamp.hour
         
         pred_dict = {
-            'hour_ahead': i + 1,
+            'timestamp': next_timestamp,
+            'hour': next_hour,
             'temp': reg_pred[0],
             'humidity': reg_pred[1],
             'windspeed': reg_pred[2],
             'sealevelpressure': reg_pred[3],
-            'weather_code_encoded': clf_pred
+            'weather_code': clf_pred,
+            # Isi kolom lain yang dibutuhkan feature engineering dengan nilai dummy/turunan
+            'day': next_timestamp.day,
+            'month': next_timestamp.month,
+            # Cyclical features update
+            'hour_sin': np.sin(2 * np.pi * next_hour / 24),
+            'hour_cos': np.cos(2 * np.pi * next_hour / 24)
         }
-        predictions.append(pred_dict)
         
-        # Update untuk iterasi berikutnya (recursive)
-        current_data['temp_lag_1'] = reg_pred[0]
-        current_data['humidity_lag_1'] = reg_pred[1]
-        current_data['windspeed_lag_1'] = reg_pred[2]
-        current_data['sealevelpressure_lag_1'] = reg_pred[3]
-        current_data['hour'] = (current_data['hour'] + 1) % 24
+        prediction_results.append(pred_dict)
         
-    return pd.DataFrame(predictions)
+        # 4. Append prediksi ke current_history untuk iterasi berikutnya
+        # Convert dict ke DataFrame dan gabung
+        next_row = pd.DataFrame([pred_dict])
+        current_history = pd.concat([current_history, next_row], ignore_index=True)
+        
+    return pd.DataFrame(prediction_results)
 ```
 
 - **Output yang Diharapkan:**
@@ -930,15 +971,19 @@ def recursive_forecast_hourly(model_reg, model_clf, last_known_data, feature_col
 # Ambil 72 jam terakhir dari test set sebagai data aktual
 actual_72h = hourly_test.tail(72).copy().reset_index(drop=True)
 
-# Lakukan forecast dari titik sebelum 72 jam terakhir
-start_point = hourly_test.iloc[-73:-72].copy()
+# Ambil data sebelum periode forecasting (buffer 48 jam untuk rolling features)
+start_idx = len(hourly_test) - 72 - 48
+history_buffer = hourly_test.iloc[start_idx : -72].copy().reset_index(drop=True)
+
+# Lakukan forecast
 forecast_72h = recursive_forecast_hourly(
     best_reg_model, 
     best_clf_model, 
-    start_point, 
+    history_buffer,  # Pass buffer data, bukan single row
     hourly_feature_cols, 
     n_hours=72
 )
+
 
 # Plot perbandingan
 fig, axes = plt.subplots(2, 2, figsize=(14, 10))
