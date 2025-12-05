@@ -531,55 +531,111 @@ class WeatherModelGUI:
         lines.append(f"Trained Date: {self.model.get('trained_date', 'Unknown')}")
         lines.append("-" * 60)
         
-        # 2. Hourly Component
-        lines.append("\n[HOURLY MODEL COMPONENT]")
-        h_reg = self.model['hourly']['regressor']
-        h_clf = self.model['hourly']['classifier']
-        
-        if h_reg:
-            lines.append(f"  Regressor:  AVAILABLE ({h_reg.__class__.__name__})")
-            if hasattr(h_reg, 'n_estimators'): lines.append(f"    - n_estimators: {h_reg.n_estimators}")
-            if hasattr(h_reg, 'max_depth'): lines.append(f"    - max_depth: {h_reg.max_depth}")
-        else:
-            lines.append("  Regressor:  NOT AVAILABLE")
-            
-        if h_clf:
-            lines.append(f"  Classifier: AVAILABLE ({h_clf.__class__.__name__})")
-        else:
-            lines.append("  Classifier: NOT AVAILABLE")
-            
-        if self.model['hourly'].get('feature_columns'):
-            lines.append("\n  Hourly Features (Input):")
-            for i, f in enumerate(self.model['hourly']['feature_columns']):
-                lines.append(f"    {i+1}. {f}")
-        
-        if self.model['hourly'].get('target_regression'):
-            lines.append(f"\n  Target (Regression): {self.model['hourly']['target_regression']}")
-        if self.model['hourly'].get('target_classification'):
-            lines.append(f"  Target (Classification): {self.model['hourly']['target_classification']}")
+        # --- Helper to format lists ---
+        def format_list(title, items, indent=2):
+            res = [f"{' ' * indent}{title}:"]
+            for i, item in enumerate(items):
+                res.append(f"{' ' * (indent + 2)}- {item}")
+            return res
 
-        # 3. Daily Component
+        def format_dict(title, data, indent=2):
+            res = [f"{' ' * indent}{title}:"]
+            for k, v in data.items():
+                res.append(f"{' ' * (indent + 2)}{k}: {v}")
+            return res
+
+        def get_classes(encoder):
+            if hasattr(encoder, 'classes_'):
+                return list(encoder.classes_)
+            return "N/A"
+
+        # 2. Encoders & Mappings (Global/Combined level)
+        lines.append("\n[GLOBAL MAPPINGS & ENCODERS]")
+        
+        # Weather Code to Rain
+        if 'weather_code_to_rain' in self.model:
+            lines.extend(format_dict("Weather Code -> Rain (mm)", self.model['weather_code_to_rain']))
+        
+        # Encoders
+        if 'label_encoder_hourly' in self.model:
+            le = self.model['label_encoder_hourly']
+            lines.extend(format_list("Label Encoder weather_code (Hourly Targets)", get_classes(le)))
+            
+        if 'label_encoder_daily' in self.model:
+            le = self.model['label_encoder_daily']
+            lines.extend(format_list("Label Encoder weather_code_dominant (Daily Targets)", get_classes(le)))
+            
+        if 'label_encoder_conditions' in self.model:
+            le = self.model['label_encoder_conditions']
+            lines.extend(format_list("Label Encoder (Conditions)", get_classes(le)))
+
+        # 3. Hourly Component
+        lines.append("\n" + "-" * 60)
+        lines.append("[HOURLY MODEL COMPONENT]")
+        
+        if self.model.get('hourly'):
+            h_data = self.model['hourly']
+            h_reg = h_data.get('regressor')
+            h_clf = h_data.get('classifier')
+            
+            # Check for package-level specific items if not at global
+            if 'label_encoder' in h_data:
+                le = h_data['label_encoder']
+                lines.extend(format_list("Label Encoder (Local)", get_classes(le)))
+            
+            if h_reg:
+                lines.append(f"  Regressor:  AVAILABLE ({h_reg.__class__.__name__})")
+                if hasattr(h_reg, 'n_estimators'): lines.append(f"    - n_estimators: {h_reg.n_estimators}")
+            else:
+                lines.append("  Regressor:  NOT AVAILABLE")
+                
+            if h_clf:
+                lines.append(f"  Classifier: AVAILABLE ({h_clf.__class__.__name__})")
+            else:
+                lines.append("  Classifier: NOT AVAILABLE")
+                
+            if h_data.get('feature_columns'):
+                lines.extend(format_list("Features (Input)", h_data['feature_columns']))
+            
+            if h_data.get('target_regression'):
+                lines.extend(format_list("Target (Regression)", h_data['target_regression'] if isinstance(h_data['target_regression'], list) else [h_data['target_regression']]))
+            
+            if h_data.get('target_classification'):
+                lines.append(f"  Target (Classification): {h_data['target_classification']}")
+
+        # 4. Daily Component
         lines.append("\n" + "-" * 60)
         lines.append("[DAILY MODEL COMPONENT]")
-        d_reg = self.model['daily']['regressor']
-        d_clf = self.model['daily']['classifier']
         
-        if d_reg:
-            lines.append(f"  Regressor:  AVAILABLE ({d_reg.__class__.__name__})")
-        else:
-            lines.append("  Regressor:  NOT AVAILABLE")
-            
-        if d_clf:
-            lines.append(f"  Classifier: AVAILABLE ({d_clf.__class__.__name__})")
-        else:
-            lines.append("  Classifier: NOT AVAILABLE")
+        if self.model.get('daily'):
+            d_data = self.model['daily']
+            d_reg = d_data.get('regressor')
+            d_clf = d_data.get('classifier')
 
-        if self.model['daily'].get('feature_columns'):
-            lines.append("\n  Daily Features (Input):")
-            for i, f in enumerate(self.model['daily']['feature_columns']):
-                lines.append(f"    {i+1}. {f}")
-        
-        # 4. Metadata Reference
+            if 'label_encoder' in d_data:
+                le = d_data['label_encoder']
+                lines.extend(format_list("Label Encoder (Local)", get_classes(le)))
+            
+            if d_reg:
+                lines.append(f"  Regressor:  AVAILABLE ({d_reg.__class__.__name__})")
+            else:
+                lines.append("  Regressor:  NOT AVAILABLE")
+                
+            if d_clf:
+                lines.append(f"  Classifier: AVAILABLE ({d_clf.__class__.__name__})")
+            else:
+                lines.append("  Classifier: NOT AVAILABLE")
+
+            if d_data.get('feature_columns'):
+                lines.extend(format_list("Features (Input)", d_data['feature_columns']))
+            
+            if d_data.get('target_regression'):
+                lines.extend(format_list("Target (Regression)", d_data['target_regression'] if isinstance(d_data['target_regression'], list) else [d_data['target_regression']]))
+
+            if d_data.get('target_classification'):
+                 lines.append(f"  Target (Classification): {d_data['target_classification']}")
+
+        # 5. Metadata Reference
         lines.append("\n" + "=" * 60)
         lines.append("REFERENCE: Weather Codes")
         lines.append("-" * 60)
@@ -588,6 +644,7 @@ class WeatherModelGUI:
             rain = WEATHER_CODE_TO_RAIN.get(code, 0)
             lines.append(f"{code:<5} | {cond:<20} | {rain}")
             
+        
         self.info_text.insert(tk.END, "\n".join(lines))
     
     def refresh_from_time(self): # Note: No longer used but kept for compatibility if needed
