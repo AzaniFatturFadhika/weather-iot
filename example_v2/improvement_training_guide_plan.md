@@ -1,5 +1,3 @@
-
-
 poin penting:
 
 1. Proses Data Splitting (Time-Series): gunakan E**xpanding Window Cross-Validation** atau  **Rolling Window Cross-Validation** .
@@ -30,7 +28,7 @@ Mengapa ini game changer?
 
 Metode split 80-20 yang sederhana (hold-out) memiliki risiko bias. Bisa jadi 20% data terakhir adalah musim kemarau panjang, sehingga model terlihat sangat akurat padahal hanya menebak "tidak hujan".
 
-* **Implementasi:** Gunakan `TimeSeriesSplit` dari Scikit-learn.
+* **Implementasi:** Gunakan `TimeSeriesSplit` dari Scikit-learn. gunakan E**xpanding Window Cross-Validation** atau  **Rolling Window Cross-Validation**.
 * **Ilustrasi:**
   * *Iterasi 1:* Train: Jan-Mar, Test: Apr
   * *Iterasi 2:* Train: Jan-Apr, Test: Mei

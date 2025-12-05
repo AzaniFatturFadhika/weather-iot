@@ -18,33 +18,33 @@ Dataset berisi data cuaca per-jam dari tahun 2000-2024 dengan struktur **23 kolo
 
 #### Kolom Hourly (Per-Jam)
 
-| Kolom                  | Tipe     | Deskripsi                              |
-| ---------------------- | -------- | -------------------------------------- |
-| `id`                   | int      | ID unik                                |
-| `timestamp`            | datetime | Waktu pengukuran (per-jam)             |
-| `hour`, `day`, `month`, `year` | int | Komponen waktu                    |
-| `temp`                 | float    | Suhu (°C)                              |
-| `humidity`             | int      | Kelembaban (%)                         |
-| `windspeed`            | float    | Kecepatan angin (km/h)                 |
-| `sealevelpressure`     | float    | Tekanan permukaan laut (hPa)           |
-| `rain`                 | float    | Curah hujan (mm)                       |
-| `precipitation`        | float    | Presipitasi (mm) - identik dengan rain |
-| `apparent_temperature` | float    | Suhu yang dirasakan (°C)               |
-| `surface_pressure`     | float    | Tekanan permukaan (hPa)                |
-| `weather_code`         | int      | Kode cuaca (0-65)                      |
-| `conditions`           | string   | Kondisi cuaca (teks)                   |
+| Kolom                                  | Tipe     | Deskripsi                              |
+| -------------------------------------- | -------- | -------------------------------------- |
+| `id`                                 | int      | ID unik                                |
+| `timestamp`                          | datetime | Waktu pengukuran (per-jam)             |
+| `hour`, `day`, `month`, `year` | int      | Komponen waktu                         |
+| `temp`                               | float    | Suhu (°C)                             |
+| `humidity`                           | int      | Kelembaban (%)                         |
+| `windspeed`                          | float    | Kecepatan angin (km/h)                 |
+| `sealevelpressure`                   | float    | Tekanan permukaan laut (hPa)           |
+| `rain`                               | float    | Curah hujan (mm)                       |
+| `precipitation`                      | float    | Presipitasi (mm) - identik dengan rain |
+| `apparent_temperature`               | float    | Suhu yang dirasakan (°C)              |
+| `surface_pressure`                   | float    | Tekanan permukaan (hPa)                |
+| `weather_code`                       | int      | Kode cuaca (0-65)                      |
+| `conditions`                         | string   | Kondisi cuaca (teks)                   |
 
 #### Kolom Daily (Per-Hari)
 
-| Kolom                  | Tipe     | Deskripsi                              |
-| ---------------------- | -------- | -------------------------------------- |
-| `temp_max_daily`       | float    | Suhu maksimum harian (°C)              |
-| `temp_min_daily`       | float    | Suhu minimum harian (°C)               |
-| `weather_code_daily`   | int      | Kode cuaca dominan harian              |
-| `temp_mean_daily`      | float    | Suhu rata-rata harian (°C)             |
-| `humidity_avg_daily`   | int      | Kelembaban rata-rata harian (%)        |
-| `pressure_avg_daily`   | float    | Tekanan rata-rata harian (hPa)         |
-| `windspeed_avg_daily`  | float    | Kecepatan angin rata-rata harian (km/h)|
+| Kolom                   | Tipe  | Deskripsi                               |
+| ----------------------- | ----- | --------------------------------------- |
+| `temp_max_daily`      | float | Suhu maksimum harian (°C)              |
+| `temp_min_daily`      | float | Suhu minimum harian (°C)               |
+| `weather_code_daily`  | int   | Kode cuaca dominan harian               |
+| `temp_mean_daily`     | float | Suhu rata-rata harian (°C)             |
+| `humidity_avg_daily`  | int   | Kelembaban rata-rata harian (%)         |
+| `pressure_avg_daily`  | float | Tekanan rata-rata harian (hPa)          |
+| `windspeed_avg_daily` | float | Kecepatan angin rata-rata harian (km/h) |
 
 **Contoh Data (5 baris pertama):**
 
@@ -179,7 +179,7 @@ daily_df['temp_mean_lag_7'] = daily_df['temp_mean'].shift(7)
 daily_df['rain_total_lag_1'] = daily_df['rain_total'].shift(1)
 ```
 
-- **Output yang Diharapkan:** 
+- **Output yang Diharapkan:**
   - `df_hourly`: Dataset hourly dengan lag & rolling features
   - `df_daily`: Dataset daily dengan agregasi dan lag features
 
@@ -248,7 +248,7 @@ daily_df['rain_total_lag_1'] = daily_df['rain_total'].shift(1)
 
 ### 6\. Analisis Hasil dan Kinerja Individual Parameter
 
-- **Tujuan:** Evaluasi mendalam model terbaik untuk setiap parameter secara individual. misal pada bulan tertentu, januari 2022
+- **Tujuan:** Evaluasi mendalam model terbaik untuk setiap parameter secara individual. lakukan analisa pada bulan januari 2022. tampilkan dalam grafik urutan waktu untuk regresi fitur vs date (buat gap 2 hari)
 
 #### 6.1 Evaluasi Per-Parameter (Regresi)
 
@@ -306,7 +306,7 @@ daily_classifier = RandomForestClassifier(**best_params)
 daily_classifier.fit(X_daily_full, y_daily_clf_full)
 ```
 
-  4. Simpan semua model ke file `.pkl` (lihat bagian 7).
+4. Simpan semua model ke file `.pkl` (lihat bagian 7).
 
 - **Catatan:** Tidak ada evaluasi pada tahap ini karena semua data sudah digunakan untuk training.
 
@@ -331,7 +331,7 @@ combined_package = {
         'target_regression': ['temp', 'humidity', 'windspeed', 'sealevelpressure'],
         'target_classification': 'weather_code',
     },
-    
+  
     # ========== MODEL DAILY ==========
     'daily': {
         'regressor': daily_regressor,
@@ -340,7 +340,7 @@ combined_package = {
         'target_regression': ['temp_min', 'temp_max', 'temp_mean', 'humidity_avg', 'windspeed_avg', 'pressure_avg'],
         'target_classification': 'weather_code_dominant',
     },
-    
+  
     # ========== METADATA ==========
     'label_encoder': le_conditions,
     'weather_code_to_rain': {0:0, 1:0, 2:0, 3:0, 51:0.2, 53:0.7, 55:1.1, 61:1.7, 63:4.0, 65:10.3},
@@ -474,6 +474,7 @@ print(f"\n📦 Total: 7 model files created!")
 ```
 
 **Output yang Diharapkan:**
+
 ```
 models/
 ├── weather_model_combined.pkl           # ~200-400 MB (4 model)
@@ -526,26 +527,26 @@ Backend (`main.py`) harus menggunakan class yang mendukung dual-model:
 class WeatherPredictor:
     def __init__(self, model_path: str):
         self.package = joblib.load(model_path)
-        
+      
         # Hourly models
         self.hourly_reg = self.package['hourly']['regressor']
         self.hourly_clf = self.package['hourly']['classifier']
         self.hourly_features = self.package['hourly']['feature_columns']
-        
+      
         # Daily models
         self.daily_reg = self.package['daily']['regressor']
         self.daily_clf = self.package['daily']['classifier']
         self.daily_features = self.package['daily']['feature_columns']
-        
+      
         # Metadata
         self.rain_map = self.package['weather_code_to_rain']
-    
+  
     def predict_hourly(self, features: dict) -> dict:
         """Prediksi cuaca per-jam"""
         X = self._prepare_features(features, self.hourly_features)
         reg_pred = self.hourly_reg.predict(X)[0]
         weather_code = self.hourly_clf.predict(X)[0]
-        
+      
         return {
             'temp': reg_pred[0],
             'humidity': reg_pred[1],
@@ -554,13 +555,13 @@ class WeatherPredictor:
             'weather_code': int(weather_code),
             'rain': self.rain_map.get(int(weather_code), 0)
         }
-    
+  
     def predict_daily(self, features: dict) -> dict:
         """Prediksi cuaca per-hari"""
         X = self._prepare_features(features, self.daily_features)
         reg_pred = self.daily_reg.predict(X)[0]
         weather_code = self.daily_clf.predict(X)[0]
-        
+      
         return {
             'temp_min': reg_pred[0],
             'temp_max': reg_pred[1],
