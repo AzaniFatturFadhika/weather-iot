@@ -14,38 +14,49 @@ Berikut adalah kerangka urutan/struktur _notebook_ `ipynb` untuk melakukan _trai
 
 ### Sample Dataset
 
-Dataset berisi data cuaca per-jam dari tahun 2000-2024 dengan struktur kolom sebagai berikut:
+Dataset berisi data cuaca per-jam dari tahun 2000-2024 dengan struktur **23 kolom** sebagai berikut:
 
-| Kolom                                  | Tipe     | Deskripsi                              |
-| -------------------------------------- | -------- | -------------------------------------- |
-| `id`                                 | int      | ID unik                                |
-| `timestamp`                          | datetime | Waktu pengukuran (per-jam)             |
-| `hour`, `day`, `month`, `year` | int      | Komponen waktu                         |
-| `temp`                               | float    | Suhu (°C)                             |
-| `humidity`                           | int      | Kelembaban (%)                         |
-| `windspeed`                          | float    | Kecepatan angin (km/h)                 |
-| `sealevelpressure`                   | float    | Tekanan permukaan laut (hPa)           |
-| `rain`                               | float    | Curah hujan (mm)                       |
-| `precipitation`                      | float    | Presipitasi (mm) - identik dengan rain |
-| `apparent_temperature`               | float    | Suhu yang dirasakan (°C)              |
-| `surface_pressure`                   | float    | Tekanan permukaan (hPa)                |
-| `weather_code`                       | int      | Kode cuaca (0-65)                      |
-| `conditions`                         | string   | Kondisi cuaca (teks)                   |
-| `temp_max_daily`                     | float    | Suhu maksimum harian (°C)             |
-| `temp_min_daily`                     | float    | Suhu minimum harian (°C)              |
-| `weather_code_daily`                 | int      | Kode cuaca harian                      |
-| `temp_mean_daily`                    | float    | Suhu rata-rata harian (°C)            |
+#### Kolom Hourly (Per-Jam)
 
-**Contoh Data (6 baris pertama):**
+| Kolom                  | Tipe     | Deskripsi                              |
+| ---------------------- | -------- | -------------------------------------- |
+| `id`                   | int      | ID unik                                |
+| `timestamp`            | datetime | Waktu pengukuran (per-jam)             |
+| `hour`, `day`, `month`, `year` | int | Komponen waktu                    |
+| `temp`                 | float    | Suhu (°C)                              |
+| `humidity`             | int      | Kelembaban (%)                         |
+| `windspeed`            | float    | Kecepatan angin (km/h)                 |
+| `sealevelpressure`     | float    | Tekanan permukaan laut (hPa)           |
+| `rain`                 | float    | Curah hujan (mm)                       |
+| `precipitation`        | float    | Presipitasi (mm) - identik dengan rain |
+| `apparent_temperature` | float    | Suhu yang dirasakan (°C)               |
+| `surface_pressure`     | float    | Tekanan permukaan (hPa)                |
+| `weather_code`         | int      | Kode cuaca (0-65)                      |
+| `conditions`           | string   | Kondisi cuaca (teks)                   |
 
-| id | timestamp           | hour | day | month | year | temp | humidity | windspeed | weather_code | conditions |
-| -- | ------------------- | ---- | --- | ----- | ---- | ---- | -------- | --------- | ------------ | ---------- |
-| 0  | 2000-01-01 00:00:00 | 0    | 1   | 1     | 2000 | 21.8 | 98       | 4.0       | 3            | Overcast   |
-| 1  | 2000-01-01 01:00:00 | 1    | 1   | 1     | 2000 | 21.4 | 99       | 4.0       | 3            | Overcast   |
-| 2  | 2000-01-01 02:00:00 | 2    | 1   | 1     | 2000 | 21.4 | 98       | 3.2       | 3            | Overcast   |
-| 3  | 2000-01-01 03:00:00 | 3    | 1   | 1     | 2000 | 21.2 | 99       | 4.6       | 3            | Overcast   |
-| 4  | 2000-01-01 04:00:00 | 4    | 1   | 1     | 2000 | 21.0 | 99       | 3.6       | 3            | Overcast   |
-| 5  | 2000-01-01 05:00:00 | 5    | 1   | 1     | 2000 | 20.8 | 98       | 2.7       | 3            | Overcast   |
+#### Kolom Daily (Per-Hari)
+
+| Kolom                  | Tipe     | Deskripsi                              |
+| ---------------------- | -------- | -------------------------------------- |
+| `temp_max_daily`       | float    | Suhu maksimum harian (°C)              |
+| `temp_min_daily`       | float    | Suhu minimum harian (°C)               |
+| `weather_code_daily`   | int      | Kode cuaca dominan harian              |
+| `temp_mean_daily`      | float    | Suhu rata-rata harian (°C)             |
+| `humidity_avg_daily`   | int      | Kelembaban rata-rata harian (%)        |
+| `pressure_avg_daily`   | float    | Tekanan rata-rata harian (hPa)         |
+| `windspeed_avg_daily`  | float    | Kecepatan angin rata-rata harian (km/h)|
+
+**Contoh Data (5 baris pertama):**
+
+| id | timestamp           | hour | temp | humidity | windspeed | weather_code | temp_max_daily | temp_min_daily | temp_mean_daily | humidity_avg_daily | pressure_avg_daily | windspeed_avg_daily |
+| -- | ------------------- | ---- | ---- | -------- | --------- | ------------ | -------------- | -------------- | --------------- | ------------------ | ------------------ | ------------------- |
+| 0  | 2000-01-01 00:00:00 | 0    | 21.8 | 98       | 4.0       | 3            | 27.5           | 20.8           | 24.1            | 91                 | 1007.3             | 6.3                 |
+| 1  | 2000-01-01 01:00:00 | 1    | 21.4 | 99       | 4.0       | 3            | 27.5           | 20.8           | 24.1            | 91                 | 1007.3             | 6.3                 |
+| 2  | 2000-01-01 02:00:00 | 2    | 21.4 | 98       | 3.2       | 3            | 27.5           | 20.8           | 24.1            | 91                 | 1007.3             | 6.3                 |
+| 3  | 2000-01-01 03:00:00 | 3    | 21.2 | 99       | 4.6       | 3            | 27.5           | 20.8           | 24.1            | 91                 | 1007.3             | 6.3                 |
+| 4  | 2000-01-01 04:00:00 | 4    | 21.0 | 99       | 3.6       | 3            | 27.5           | 20.8           | 24.1            | 91                 | 1007.3             | 6.3                 |
+
+> **Catatan:** Kolom daily (`*_daily`) memiliki nilai yang sama untuk semua baris dalam satu hari yang sama.
 
 ---
 
@@ -123,20 +134,60 @@ is_rain = 1 if weather_code >= 50 else 0
 
 ### 4\. Pra-pemrosesan Data dan Feature Engineering (PENTING)
 
-- **Tujuan:** Menyiapkan fitur yang relevan untuk prediksi deret waktu (_Time-Series_).
+- **Tujuan:** Menyiapkan fitur yang relevan untuk prediksi deret waktu (_Time-Series_) baik untuk **Hourly** maupun **Daily**.
+
+#### 4.1 Preprocessing Data Hourly
+
 - **Langkah:**
   - **Format Waktu:** Memastikan kolom `timestamp` bertipe datetime.
   - **Label Encoding:** Mengubah `conditions` menjadi numerik.
-  - **Feature Engineering (Baru):** Membuat fitur "Lag" (nilai masa lalu) dan "Rolling Mean" untuk menangkap pola tren.
-    - `lag_1`: Nilai 1 jam yang lalu.
-    - `lag_24`: Nilai 24 jam yang lalu.
-    - `rolling_mean_24`: Rata-rata 24 jam terakhir.
-  - **Handling NaN:** Menghapus baris awal yang memiliki nilai `NaN` akibat pembuatan fitur lag.
-- **Output yang Diharapkan:** Dataset dengan kolom fitur tambahan (`temperature_lag_1`, dll) tampilkan beris pertama fata hasil pre-processing.
+  - **Feature Engineering Hourly:**
+    - `temp_lag_1`: Nilai 1 jam yang lalu
+    - `temp_lag_24`: Nilai 24 jam yang lalu (kemarin jam yang sama)
+    - `temp_rolling_24`: Rata-rata 24 jam terakhir
+    - (Sama untuk humidity, windspeed, sealevelpressure)
+  - **Handling NaN:** Menghapus baris awal dengan nilai `NaN`.
+
+#### 4.2 Preprocessing Data Daily (BARU)
+
+Dataset sudah memiliki kolom daily: `temp_max_daily`, `temp_min_daily`, `weather_code_daily`, `temp_mean_daily`. Namun kita perlu membuat dataset daily terpisah.
+
+```python
+# Agregasi data hourly menjadi daily
+daily_df = df_processed.groupby(['year', 'month', 'day']).agg({
+    'temp': ['min', 'max', 'mean'],
+    'humidity': 'mean',
+    'windspeed': 'mean',
+    'sealevelpressure': 'mean',
+    'weather_code': lambda x: x.mode()[0],  # Dominan weather_code
+    'rain': 'sum'  # Total curah hujan
+}).reset_index()
+
+# Flatten column names
+daily_df.columns = ['year', 'month', 'day', 
+                    'temp_min', 'temp_max', 'temp_mean',
+                    'humidity_avg', 'windspeed_avg', 'pressure_avg',
+                    'weather_code_dominant', 'rain_total']
+
+# Feature Engineering Daily
+daily_df['temp_min_lag_1'] = daily_df['temp_min'].shift(1)   # Kemarin
+daily_df['temp_max_lag_1'] = daily_df['temp_max'].shift(1)
+daily_df['temp_mean_lag_1'] = daily_df['temp_mean'].shift(1)
+daily_df['temp_min_lag_7'] = daily_df['temp_min'].shift(7)   # Seminggu lalu
+daily_df['temp_max_lag_7'] = daily_df['temp_max'].shift(7)
+daily_df['temp_mean_lag_7'] = daily_df['temp_mean'].shift(7)
+daily_df['rain_total_lag_1'] = daily_df['rain_total'].shift(1)
+```
+
+- **Output yang Diharapkan:** 
+  - `df_hourly`: Dataset hourly dengan lag & rolling features
+  - `df_daily`: Dataset daily dengan agregasi dan lag features
 
 ### 5\. Pelatihan dan Perbandingan Model (Komprehensif)
 
-- **Tujuan:** Membandingkan berbagai algoritma untuk memilih model terbaik bagi Regresi (data kontinu) dan Klasifikasi (kondisi cuaca).
+- **Tujuan:** Membandingkan berbagai algoritma untuk memilih model terbaik untuk:
+  - **Model Hourly**: Prediksi per-jam (temp, humidity, windspeed, pressure, weather_code)
+  - **Model Daily**: Prediksi per-hari (temp_min, temp_max, temp_mean, humidity_avg, windspeed_avg, pressure_avg, weather_code_dominant)
 
 #### 5.1 Pemisahan Data (Time-Series Split)
 
@@ -231,69 +282,207 @@ Menampilkan metrik terpisah untuk setiap target:
 - **Tujuan:** Memaksimalkan performa model final dengan memanfaatkan seluruh data yang tersedia.
 - **Langkah:**
 
-  1. Pilih model terbaik dari hasil perbandingan (misal: Random Forest).
+  1. Pilih model terbaik dari hasil perbandingan (misal: Random Forest untuk semua).
   2. Gabungkan kembali `train_df` dan `test_df` menjadi `full_df`.
-  3. Latih model dengan seluruh data:
-     ```python
-     # Final training dengan 100% data
-     final_regressor = RandomForestRegressor(**best_params)
-     final_regressor.fit(X_full, y_full)
+  3. Latih **4 model** dengan seluruh data:
 
-     final_classifier = RandomForestClassifier(**best_params)
-     final_classifier.fit(X_full, y_class_full)
-     ```
-  4. Simpan model final ke file `.pkl`.
-- **Catatan:** Tidak ada evaluasi pada tahap ini karena semua data sudah digunakan untuk training. Evaluasi sudah dilakukan pada tahap 5-6.
+```python
+# ===== MODEL HOURLY =====
+# Regresi Hourly: temp, humidity, windspeed, pressure
+hourly_regressor = RandomForestRegressor(**best_params)
+hourly_regressor.fit(X_hourly_full, y_hourly_reg_full)
 
-### 7. Penyimpanan Model Terbaik (Single File)
+# Klasifikasi Hourly: weather_code
+hourly_classifier = RandomForestClassifier(**best_params)
+hourly_classifier.fit(X_hourly_full, y_hourly_clf_full)
 
-- **Tujuan:** Menyimpan semua model dan metadata yang diperlukan ke dalam **SATU file `.pkl`** agar mudah dimuat oleh Backend untuk inference.
+# ===== MODEL DAILY =====
+# Regresi Daily: temp_min, temp_max, temp_mean, humidity_avg, etc.
+daily_regressor = RandomForestRegressor(**best_params)
+daily_regressor.fit(X_daily_full, y_daily_reg_full)
+
+# Klasifikasi Daily: weather_code_dominant
+daily_classifier = RandomForestClassifier(**best_params)
+daily_classifier.fit(X_daily_full, y_daily_clf_full)
+```
+
+  4. Simpan semua model ke file `.pkl` (lihat bagian 7).
+
+- **Catatan:** Tidak ada evaluasi pada tahap ini karena semua data sudah digunakan untuk training.
+
+### 7. Penyimpanan Model Terbaik (3 File .pkl)
+
+- **Tujuan:** Menyimpan model ke dalam **3 file `.pkl`** untuk fleksibilitas deployment:
+  1. **`weather_model_combined.pkl`** - Semua model dalam satu file (Hourly + Daily)
+  2. **`weather_model_hourly.pkl`** - Model hourly saja
+  3. **`weather_model_daily.pkl`** - Model daily saja
 
 #### 7.1 Struktur File .pkl
 
-Model disimpan dalam format dictionary dengan struktur berikut:
+##### A. Combined Model (`weather_model_combined.pkl`)
 
 ```python
-model_package = {
-    # Model
-    'regressor': final_regressor,           # RandomForestRegressor (atau model terbaik)
-    'classifier': final_classifier,         # RandomForestClassifier (atau model terbaik)
-    
-    # Metadata untuk Feature Engineering
-    'feature_columns': feature_cols,        # List kolom fitur yang digunakan
-    'target_regression': ['temp', 'humidity', 'windspeed', 'sealevelpressure'],
-    'target_classification': 'weather_code',
-    
-    # Encoder (untuk decode hasil prediksi)
-    'label_encoder': le_conditions,         # LabelEncoder untuk conditions
-    
-    # Mapping weather_code ke rain (deterministik)
-    'weather_code_to_rain': {
-        0: 0, 1: 0, 2: 0, 3: 0,
-        51: 0.2, 53: 0.7, 55: 1.1,
-        61: 1.7, 63: 4.0, 65: 10.3
+combined_package = {
+    # ========== MODEL HOURLY ==========
+    'hourly': {
+        'regressor': hourly_regressor,
+        'classifier': hourly_classifier,
+        'feature_columns': hourly_feature_cols,
+        'target_regression': ['temp', 'humidity', 'windspeed', 'sealevelpressure'],
+        'target_classification': 'weather_code',
     },
     
-    # Versi dan info
-    'version': '2.0',
+    # ========== MODEL DAILY ==========
+    'daily': {
+        'regressor': daily_regressor,
+        'classifier': daily_classifier,
+        'feature_columns': daily_feature_cols,
+        'target_regression': ['temp_min', 'temp_max', 'temp_mean', 'humidity_avg', 'windspeed_avg', 'pressure_avg'],
+        'target_classification': 'weather_code_dominant',
+    },
+    
+    # ========== METADATA ==========
+    'label_encoder': le_conditions,
+    'weather_code_to_rain': {0:0, 1:0, 2:0, 3:0, 51:0.2, 53:0.7, 55:1.1, 61:1.7, 63:4.0, 65:10.3},
+    'version': '2.1',
     'trained_date': datetime.now().isoformat(),
-    'data_range': {'start': '2000-01-01', 'end': '2024-12-31'}
+    'model_type': 'combined'
 }
 ```
 
-#### 7.2 Menyimpan Model (Training)
+##### B. Hourly Model (`weather_model_hourly.pkl`)
+
+```python
+hourly_package = {
+    'regressor': hourly_regressor,
+    'classifier': hourly_classifier,
+    'feature_columns': hourly_feature_cols,
+    'target_regression': ['temp', 'humidity', 'windspeed', 'sealevelpressure'],
+    'target_classification': 'weather_code',
+    'label_encoder': le_conditions,
+    'weather_code_to_rain': {0:0, 1:0, 2:0, 3:0, 51:0.2, 53:0.7, 55:1.1, 61:1.7, 63:4.0, 65:10.3},
+    'version': '2.1',
+    'trained_date': datetime.now().isoformat(),
+    'model_type': 'hourly'
+}
+```
+
+##### C. Daily Model (`weather_model_daily.pkl`)
+
+```python
+daily_package = {
+    'regressor': daily_regressor,
+    'classifier': daily_classifier,
+    'feature_columns': daily_feature_cols,
+    'target_regression': ['temp_min', 'temp_max', 'temp_mean', 'humidity_avg', 'windspeed_avg', 'pressure_avg'],
+    'target_classification': 'weather_code_dominant',
+    'label_encoder': le_conditions,
+    'weather_code_to_rain': {0:0, 1:0, 2:0, 3:0, 51:0.2, 53:0.7, 55:1.1, 61:1.7, 63:4.0, 65:10.3},
+    'version': '2.1',
+    'trained_date': datetime.now().isoformat(),
+    'model_type': 'daily'
+}
+```
+
+##### D. Model Terpisah (Regressor & Classifier)
+
+Untuk fleksibilitas maksimal, simpan juga model regressor dan classifier secara terpisah:
+
+```python
+# Hourly - Regressor Only
+hourly_reg_package = {
+    'model': hourly_regressor,
+    'feature_columns': hourly_feature_cols,
+    'target': ['temp', 'humidity', 'windspeed', 'sealevelpressure'],
+    'version': '2.1',
+    'model_type': 'hourly_regressor'
+}
+
+# Hourly - Classifier Only
+hourly_clf_package = {
+    'model': hourly_classifier,
+    'feature_columns': hourly_feature_cols,
+    'target': 'weather_code',
+    'label_encoder': le_conditions,
+    'weather_code_to_rain': {0:0, 1:0, 2:0, 3:0, 51:0.2, 53:0.7, 55:1.1, 61:1.7, 63:4.0, 65:10.3},
+    'version': '2.1',
+    'model_type': 'hourly_classifier'
+}
+
+# Daily - Regressor Only
+daily_reg_package = {
+    'model': daily_regressor,
+    'feature_columns': daily_feature_cols,
+    'target': ['temp_min', 'temp_max', 'temp_mean', 'humidity_avg', 'windspeed_avg', 'pressure_avg'],
+    'version': '2.1',
+    'model_type': 'daily_regressor'
+}
+
+# Daily - Classifier Only
+daily_clf_package = {
+    'model': daily_classifier,
+    'feature_columns': daily_feature_cols,
+    'target': 'weather_code_dominant',
+    'label_encoder': le_conditions,
+    'weather_code_to_rain': {0:0, 1:0, 2:0, 3:0, 51:0.2, 53:0.7, 55:1.1, 61:1.7, 63:4.0, 65:10.3},
+    'version': '2.1',
+    'model_type': 'daily_classifier'
+}
+```
+
+#### 7.2 Menyimpan 7 File Model (Training)
 
 ```python
 import joblib
+import os
 from datetime import datetime
 
-# Simpan ke file .pkl
-MODEL_PATH = 'models/weather_model_v2.pkl'
-joblib.dump(model_package, MODEL_PATH)
+# Pastikan folder models ada
+os.makedirs('models', exist_ok=True)
 
-print(f"✅ Model disimpan ke: {MODEL_PATH}")
-print(f"   - Regressor: {type(model_package['regressor']).__name__}")
-print(f"   - Classifier: {type(model_package['classifier']).__name__}")
+# ===== 3 FILE UTAMA =====
+# 1. Combined Model (Hourly + Daily)
+joblib.dump(combined_package, 'models/weather_model_combined.pkl')
+print("✅ Combined model saved")
+
+# 2. Hourly Model (Regressor + Classifier)
+joblib.dump(hourly_package, 'models/weather_model_hourly.pkl')
+print("✅ Hourly model saved")
+
+# 3. Daily Model (Regressor + Classifier)
+joblib.dump(daily_package, 'models/weather_model_daily.pkl')
+print("✅ Daily model saved")
+
+# ===== 4 FILE TERPISAH (REGRESSOR & CLASSIFIER) =====
+# 4. Hourly Regressor Only
+joblib.dump(hourly_reg_package, 'models/weather_model_hourly_regressor.pkl')
+print("✅ Hourly regressor saved")
+
+# 5. Hourly Classifier Only
+joblib.dump(hourly_clf_package, 'models/weather_model_hourly_classifier.pkl')
+print("✅ Hourly classifier saved")
+
+# 6. Daily Regressor Only
+joblib.dump(daily_reg_package, 'models/weather_model_daily_regressor.pkl')
+print("✅ Daily regressor saved")
+
+# 7. Daily Classifier Only
+joblib.dump(daily_clf_package, 'models/weather_model_daily_classifier.pkl')
+print("✅ Daily classifier saved")
+
+print(f"\n📦 Total: 7 model files created!")
+```
+
+**Output yang Diharapkan:**
+```
+models/
+├── weather_model_combined.pkl           # ~200-400 MB (4 model)
+├── weather_model_hourly.pkl             # ~100-200 MB (2 model)
+├── weather_model_daily.pkl              # ~100-200 MB (2 model)
+├── weather_model_hourly_regressor.pkl   # ~50-100 MB (1 model)
+├── weather_model_hourly_classifier.pkl  # ~50-100 MB (1 model)
+├── weather_model_daily_regressor.pkl    # ~50-100 MB (1 model)
+└── weather_model_daily_classifier.pkl   # ~50-100 MB (1 model)
 ```
 
 #### 7.3 Memuat Model (Inference/Backend)
@@ -304,41 +493,58 @@ import joblib
 # Load model package
 model_package = joblib.load('models/weather_model_v2.pkl')
 
-# Akses komponen
-regressor = model_package['regressor']
-classifier = model_package['classifier']
-feature_cols = model_package['feature_columns']
+# Akses komponen HOURLY
+hourly_reg = model_package['hourly']['regressor']
+hourly_clf = model_package['hourly']['classifier']
+hourly_features = model_package['hourly']['feature_columns']
+
+# Akses komponen DAILY
+daily_reg = model_package['daily']['regressor']
+daily_clf = model_package['daily']['classifier']
+daily_features = model_package['daily']['feature_columns']
+
+# Metadata
 rain_map = model_package['weather_code_to_rain']
 
-# Contoh prediksi
-X_new = prepare_features(input_data, feature_cols)  # Siapkan fitur
-pred_values = regressor.predict(X_new)              # Prediksi temp, hum, wind, pressure
-pred_code = classifier.predict(X_new)               # Prediksi weather_code
-pred_rain = rain_map.get(pred_code[0], 0)           # Derive rain dari weather_code
+# Contoh prediksi HOURLY
+X_hourly = prepare_hourly_features(input_data, hourly_features)
+pred_hourly = hourly_reg.predict(X_hourly)  # [temp, humidity, windspeed, pressure]
+pred_code_hourly = hourly_clf.predict(X_hourly)[0]
+
+# Contoh prediksi DAILY
+X_daily = prepare_daily_features(input_data, daily_features)
+pred_daily = daily_reg.predict(X_daily)  # [temp_min, temp_max, temp_mean, ...]
+pred_code_daily = daily_clf.predict(X_daily)[0]
 ```
 
 #### 7.4 Sinkronisasi dengan Backend API
 
-Backend (`main.py`) harus menggunakan struktur yang sama:
+Backend (`main.py`) harus menggunakan class yang mendukung dual-model:
 
 ```python
 # Di main.py atau model_loader.py
 class WeatherPredictor:
     def __init__(self, model_path: str):
         self.package = joblib.load(model_path)
-        self.regressor = self.package['regressor']
-        self.classifier = self.package['classifier']
-        self.feature_cols = self.package['feature_columns']
+        
+        # Hourly models
+        self.hourly_reg = self.package['hourly']['regressor']
+        self.hourly_clf = self.package['hourly']['classifier']
+        self.hourly_features = self.package['hourly']['feature_columns']
+        
+        # Daily models
+        self.daily_reg = self.package['daily']['regressor']
+        self.daily_clf = self.package['daily']['classifier']
+        self.daily_features = self.package['daily']['feature_columns']
+        
+        # Metadata
         self.rain_map = self.package['weather_code_to_rain']
     
-    def predict(self, features: dict) -> dict:
-        X = self._prepare_features(features)
-        
-        # Regresi
-        reg_pred = self.regressor.predict(X)[0]
-        
-        # Klasifikasi
-        weather_code = self.classifier.predict(X)[0]
+    def predict_hourly(self, features: dict) -> dict:
+        """Prediksi cuaca per-jam"""
+        X = self._prepare_features(features, self.hourly_features)
+        reg_pred = self.hourly_reg.predict(X)[0]
+        weather_code = self.hourly_clf.predict(X)[0]
         
         return {
             'temp': reg_pred[0],
@@ -348,9 +554,26 @@ class WeatherPredictor:
             'weather_code': int(weather_code),
             'rain': self.rain_map.get(int(weather_code), 0)
         }
+    
+    def predict_daily(self, features: dict) -> dict:
+        """Prediksi cuaca per-hari"""
+        X = self._prepare_features(features, self.daily_features)
+        reg_pred = self.daily_reg.predict(X)[0]
+        weather_code = self.daily_clf.predict(X)[0]
+        
+        return {
+            'temp_min': reg_pred[0],
+            'temp_max': reg_pred[1],
+            'temp_mean': reg_pred[2],
+            'humidity_avg': reg_pred[3],
+            'windspeed_avg': reg_pred[4],
+            'pressure_avg': reg_pred[5],
+            'weather_code_dominant': int(weather_code),
+            'rain_total': self.rain_map.get(int(weather_code), 0)
+        }
 ```
 
-- **Output yang Diharapkan:** File `weather_model_v2.pkl` tersimpan di folder `models/` dengan ukuran ~50-200 MB (tergantung model).
+- **Output yang Diharapkan:** File `weather_model_v2.pkl` tersimpan di folder `models/` dengan ukuran ~100-400 MB (karena 4 model).
 
 ### 8. Implementasi Multi-Step Forecasting (Recursive Strategy)
 
