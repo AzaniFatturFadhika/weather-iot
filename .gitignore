@@ -47,3 +47,30 @@ credentials.json
 *.backup
 *_old
 *_backup
+
+# ============================================
+# example_v2 - Weather Prediction Model Files
+# ============================================
+
+# Trained models (large files)
+example_v2/model_training/models/*.pkl
+example_v2/model_training/models/*.joblib
+example_v2/models/*.pkl
+example_v2/models/*.joblib
+
+# Dataset files (large CSV files)
+example_v2/data/*.csv
+
+# Visualization outputs
+example_v2/visualizations/*.png
+example_v2/visualizations/*.jpg
+example_v2/visualizations/*.jpeg
+
+# Model training outputs
+example_v2/model_training/outputs/
+
+# Python cache in example_v2
+example_v2/**/__pycache__/
+
+# Jupyter notebook checkpoints
+example_v2/**/.ipynb_checkpoints/

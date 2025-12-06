@@ -1,31 +1,31 @@
 # -*- coding: utf-8 -*-
 """
-Weather Model Testing GUI v2
-=============================
-GUI untuk menguji model prediksi cuaca dengan fitur:
-- Pemilihan model dinamis (Browse .pkl)
-- Input tanggal FROM (sekarang) TO (pilihan)
-- Support 7 variasi format model
-- Comprehensive Model Info
+Weather Model Testing GUI v1
+============================
+GUI untuk model cuaca yang di-training dengan Lag & Rolling Features.
+Sesuai dengan MODEL_USAGE_GUIDE.md.
+
+FITUR MODEL:
+- Hourly (13 fitur): hour, month, temp_lag_*, humidity_lag_*, windspeed_lag_*, pressure_lag_*, rolling_24
+- Daily (12 fitur): month, day, temp_*_lag_1, temp_*_lag_7, humidity_avg_lag_1, rain_total_lag_1
 
 Requirements:
-    pip install joblib numpy tkcalendar
+    pip install joblib numpy pandas tkcalendar
 """
 
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext, filedialog
 import joblib
 import numpy as np
+import pandas as pd
 from datetime import datetime, timedelta
 import os
 
-# Try to import tkcalendar, fallback to manual input if not available
 try:
     from tkcalendar import DateEntry
     TKCALENDAR_AVAILABLE = True
 except ImportError:
     TKCALENDAR_AVAILABLE = False
-    print("tkcalendar not installed. Run: pip install tkcalendar")
 
 # ===================== CONSTANTS =====================
 WEATHER_CODE_TO_RAIN = {
@@ -40,951 +40,486 @@ WEATHER_CODE_TO_CONDITION = {
     61: 'Rain, Overcast', 63: 'Rain, Overcast', 65: 'Heavy Rain'
 }
 
-DEFAULT_MODEL_PATH = r'D:/laragon/www/weather-iot/example_v2/model_training/models/weather_model_combined.pkl'
+# Default model path (v1)
+DEFAULT_MODEL_PATH = r'models/weather_model_combined.pkl'
 
 class WeatherModelGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Weather Model Testing GUI v2")
-        self.root.geometry("1000x850")
-        self.root.resizable(True, True)
+        self.root.title("Weather Model Testing GUI v1 (Lag/Rolling Features)")
+        self.root.geometry("1000x800")
         
-        # Model state
         self.model = None
         self.model_path = DEFAULT_MODEL_PATH
-        self.hourly_features = []
-        self.daily_features = []
+        self.predictions_cache = []
         
-        # Default feature values
+        # --- Expected Features (from MODEL_USAGE_GUIDE.md) ---
+        self.hourly_features = [
+            'hour', 'month',
+            'temp_lag_1', 'temp_lag_24', 'temp_rolling_24',
+            'humidity_lag_1', 'humidity_lag_24', 'humidity_rolling_24',
+            'windspeed_lag_1', 'windspeed_lag_24', 'windspeed_rolling_24',
+            'sealevelpressure_lag_1', 'sealevelpressure_lag_24'
+        ]
+        
+        self.daily_features = [
+            'month', 'day',
+            'temp_min_lag_1', 'temp_max_lag_1', 'temp_mean_lag_1',
+            'humidity_avg_lag_1', 'windspeed_avg_lag_1', 'pressure_avg_lag_1',
+            'temp_min_lag_7', 'temp_max_lag_7', 'temp_mean_lag_7',
+            'rain_total_lag_1'
+        ]
+        
+        # Default values for recursive forecast (baseline)
         self.default_hourly = {
-            'temp_lag_1': 28.5, 'temp_lag_24': 27.0, 'temp_rolling_24': 26.8,
-            'humidity_lag_1': 75, 'humidity_lag_24': 80, 'humidity_rolling_24': 78,
-            'windspeed_lag_1': 5.2, 'windspeed_lag_24': 4.8, 'windspeed_rolling_24': 5.0,
+            'hour': 0, 'month': 1,
+            'temp_lag_1': 28.5, 'temp_lag_24': 27.0, 'temp_rolling_24': 27.5,
+            'humidity_lag_1': 75, 'humidity_lag_24': 78, 'humidity_rolling_24': 76,
+            'windspeed_lag_1': 5.0, 'windspeed_lag_24': 5.5, 'windspeed_rolling_24': 5.2,
             'sealevelpressure_lag_1': 1010.5, 'sealevelpressure_lag_24': 1011.0
         }
-        
         self.default_daily = {
+            'month': 1, 'day': 1,
             'temp_min_lag_1': 22.5, 'temp_max_lag_1': 31.0, 'temp_mean_lag_1': 26.5,
-            'humidity_avg_lag_1': 78, 'windspeed_avg_lag_1': 5.5, 'pressure_avg_lag_1': 1010.2,
+            'humidity_avg_lag_1': 78, 'windspeed_avg_lag_1': 5.5, 'pressure_avg_lag_1': 1010.0,
             'temp_min_lag_7': 22.0, 'temp_max_lag_7': 30.5, 'temp_mean_lag_7': 26.0,
             'rain_total_lag_1': 2.5
         }
         
-        # Create UI
         self.create_widgets()
         
-        # Load default model if exists
         if os.path.exists(self.model_path):
             self.load_model(self.model_path)
-    
+
     def create_widgets(self):
-        # --- Top Bar (Model Selection) ---
-        top_frame = ttk.LabelFrame(self.root, text="Model Configuration")
-        top_frame.pack(fill='x', padx=10, pady=5)
+        # Top: Model Selection
+        model_frame = ttk.LabelFrame(self.root, text="Model Configuration")
+        model_frame.pack(fill='x', padx=10, pady=5)
         
-        ttk.Label(top_frame, text="Current Model:").pack(side='left', padx=5)
+        ttk.Label(model_frame, text="Model:").pack(side='left', padx=5)
+        self.path_var = tk.StringVar(value=self.model_path)
+        ttk.Entry(model_frame, textvariable=self.path_var, width=60).pack(side='left', padx=5, fill='x', expand=True)
+        ttk.Button(model_frame, text="Browse", command=self.browse_model).pack(side='left', padx=5)
+        ttk.Button(model_frame, text="Load", command=lambda: self.load_model(self.path_var.get())).pack(side='left', padx=5)
         
-        self.path_entry = ttk.Entry(top_frame, width=70)
-        self.path_entry.pack(side='left', padx=5, fill='x', expand=True)
-        self.path_entry.insert(0, self.model_path)
-        
-        ttk.Button(top_frame, text="Browse...", command=self.browse_model).pack(side='left', padx=5)
-        ttk.Button(top_frame, text="Load", command=lambda: self.load_model(self.path_entry.get())).pack(side='left', padx=5)
-        
-        # --- Main Notebook ---
+        # Notebook
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill='both', expand=True, padx=10, pady=10)
         
-        # Tab 1: Date Range Forecast
+        # Tab 1: Range Forecast
         self.range_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.range_frame, text="  Forecast by Date Range  ")
+        self.notebook.add(self.range_frame, text="  Forecast Range  ")
         self.create_range_tab()
         
-        # Tab 2: Hourly Prediction
+        # Tab 2: Single Hourly
         self.hourly_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.hourly_frame, text="  Single Hourly  ")
         self.create_hourly_tab()
         
-        # Tab 3: Daily Prediction
+        # Tab 3: Single Daily
         self.daily_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.daily_frame, text="  Single Daily  ")
         self.create_daily_tab()
         
-        # Tab 4: Model Info
+        # Tab 4: Info
         self.info_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.info_frame, text="  Model Info  ")
         self.create_info_tab()
         
-        # Status bar
+        # Status Bar
         self.status_var = tk.StringVar(value="Ready")
-        status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor='w')
-        status_bar.pack(fill='x', side='bottom', padx=5, pady=2)
-    
+        ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor='w').pack(side='bottom', fill='x', padx=5, pady=2)
+
+    # --- Model Loading ---
     def browse_model(self):
-        """Open file dialog to select model"""
-        initial_dir = os.path.dirname(self.path_entry.get())
-        if not os.path.exists(initial_dir):
-            initial_dir = os.getcwd()
-            
-        filename = filedialog.askopenfilename(
-            initialdir=initial_dir,
-            title="Select Weather Model (.pkl)",
-            filetypes=(("Pickle Files", "*.pkl"), ("All Files", "*.*"))
-        )
-        
-        if filename:
-            self.path_entry.delete(0, tk.END)
-            self.path_entry.insert(0, filename)
-            self.load_model(filename)
-            
+        f = filedialog.askopenfilename(filetypes=[("Pickle", "*.pkl")])
+        if f:
+            self.path_var.set(f)
+            self.load_model(f)
+
     def load_model(self, path):
-        """
-        Load model from path and normalize structure to support all 7 types
-        """
         if not os.path.exists(path):
-            messagebox.showerror("Error", f"Model file not found: {path}")
+            messagebox.showerror("Error", f"File not found: {path}")
             return
-            
         try:
-            raw_model = joblib.load(path)
+            raw = joblib.load(path)
+            self.model = self._normalize_model(raw)
             self.model_path = path
             
-            # Normalize model structure
-            self.model = self._normalize_model(raw_model)
-            
-            # Update features lists if available
+            # Override features if model specifies them
             if self.model['hourly'].get('feature_columns'):
                 self.hourly_features = self.model['hourly']['feature_columns']
             if self.model['daily'].get('feature_columns'):
                 self.daily_features = self.model['daily']['feature_columns']
-            
+                
             self.status_var.set(f"Loaded: {os.path.basename(path)}")
             self.show_model_info()
-            
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to load model: {str(e)}")
-            self.status_var.set("Error loading model!")
+            messagebox.showerror("Error", str(e))
 
-    def _normalize_model(self, raw_model):
-        """
-        Normalize loaded model into standard structure:
-        {
-            'hourly': {'regressor': ..., 'classifier': ..., 'feature_columns': ...},
-            'daily': {'regressor': ..., 'classifier': ..., 'feature_columns': ...},
-            'version': ...,
-            'type': ...
-        }
-        """
-        normalized = {
+    def _normalize_model(self, raw):
+        norm = {
             'hourly': {'regressor': None, 'classifier': None, 'feature_columns': []},
             'daily': {'regressor': None, 'classifier': None, 'feature_columns': []},
-            'version': raw_model.get('version', 'Unknown'),
-            'type': raw_model.get('model_type', 'Unknown'),
-            'trained_date': raw_model.get('trained_date', 'Unknown')
+            'weather_code_to_rain': WEATHER_CODE_TO_RAIN
         }
-        
-        # Case 1: Combined Model
-        if 'hourly' in raw_model and 'daily' in raw_model:
-            return raw_model
-            
-        # Case 2: Hourly/Daily Package (has 'regressor' and 'classifier')
-        elif 'regressor' in raw_model and 'classifier' in raw_model:
-            m_type = raw_model.get('model_type', '')
-            if 'daily' in m_type:
-                normalized['daily'] = raw_model
-            else: # Default to hourly if unspecified or hourly
-                normalized['hourly'] = raw_model
-                
-        # Case 3: Single Model (has 'model' key)
-        elif 'model' in raw_model:
-            m_type = raw_model.get('model_type', '')
-            target_pkg = 'daily' if 'daily' in m_type else 'hourly'
-            component = 'classifier' if 'classifier' in m_type else 'regressor'
-            
-            normalized[target_pkg][component] = raw_model['model']
-            normalized[target_pkg]['feature_columns'] = raw_model.get('feature_columns', [])
-            
-            # Additional metadata mapping
-            if 'target' in raw_model:
-                key = 'target_classification' if component == 'classifier' else 'target_regression'
-                normalized[target_pkg][key] = raw_model['target']
-                
-        return normalized
+        # Combined
+        if 'hourly' in raw and 'daily' in raw:
+            norm['hourly'] = raw['hourly']
+            norm['daily'] = raw['daily']
+            norm['weather_code_to_rain'] = raw.get('weather_code_to_rain', WEATHER_CODE_TO_RAIN)
+        # Partial (hourly or daily package)
+        elif 'regressor' in raw:
+            is_daily = 'daily' in raw.get('model_type', '')
+            key = 'daily' if is_daily else 'hourly'
+            norm[key] = raw
+        return norm
 
+    # --- Tab 1: Range Forecast ---
     def create_range_tab(self):
-        """Create Date Range Forecast Tab"""
-        ttk.Label(self.range_frame, text="Weather Forecast by Date Range",
-                  font=('Segoe UI', 16, 'bold')).pack(pady=10)
+        ttk.Label(self.range_frame, text="Recursive Multi-Step Forecast", font=('Segoe UI', 14, 'bold')).pack(pady=10)
         
-        # Date selection frame
-        date_frame = ttk.LabelFrame(self.range_frame, text="Select Forecast Period")
-        date_frame.pack(fill='x', padx=10, pady=5)
+        ctrl = ttk.LabelFrame(self.range_frame, text="Settings")
+        ctrl.pack(fill='x', padx=10, pady=5)
+        
+        row1 = ttk.Frame(ctrl)
+        row1.pack(fill='x', padx=5, pady=5)
         
         now = datetime.now()
-        
-        # FROM section
-        from_frame = ttk.Frame(date_frame)
-        from_frame.pack(fill='x', padx=10, pady=10)
-        
-        ttk.Label(from_frame, text="FROM (Start):", font=('Segoe UI', 11, 'bold')).pack(side='left', padx=5)
-        
-        # FROM Date picker
+        ttk.Label(row1, text="From:").pack(side='left')
         if TKCALENDAR_AVAILABLE:
-            self.from_date = DateEntry(from_frame, width=12, date_pattern='yyyy-mm-dd',
-                                     year=now.year, month=now.month, day=now.day)
-            self.from_date.pack(side='left', padx=5)
+            self.from_date = DateEntry(row1, width=12, date_pattern='yyyy-mm-dd')
+            self.from_date.set_date(now)
         else:
-            # Fallback: manual date entry
-            ttk.Label(from_frame, text="Date (YYYY-MM-DD):").pack(side='left', padx=5)
-            self.from_date = ttk.Entry(from_frame, width=12)
-            self.from_date.pack(side='left', padx=5)
-            self.from_date.insert(0, now.strftime("%Y-%m-%d"))
+            self.from_date = ttk.Entry(row1, width=12)
+            self.from_date.insert(0, now.strftime('%Y-%m-%d'))
+        self.from_date.pack(side='left', padx=5)
         
-        # FROM Time picker
-        ttk.Label(from_frame, text="Hour:").pack(side='left', padx=10)
-        self.from_hour = ttk.Spinbox(from_frame, from_=0, to=23, width=5, format="%02.0f")
-        self.from_hour.pack(side='left', padx=2)
+        self.from_hour = ttk.Spinbox(row1, from_=0, to=23, width=4)
         self.from_hour.set(now.hour)
+        self.from_hour.pack(side='left')
         
-        ttk.Label(from_frame, text=":").pack(side='left')
-        
-        self.from_minute = ttk.Spinbox(from_frame, from_=0, to=59, width=5, format="%02.0f")
-        self.from_minute.pack(side='left', padx=2)
-        self.from_minute.set(now.minute)
-        
-        # TO section
-        to_frame = ttk.Frame(date_frame)
-        to_frame.pack(fill='x', padx=10, pady=10)
-        
-        ttk.Label(to_frame, text="TO (End):", font=('Segoe UI', 11, 'bold')).pack(side='left', padx=5)
-        
-        # TO Date picker
+        ttk.Label(row1, text="To:").pack(side='left', padx=10)
         if TKCALENDAR_AVAILABLE:
-            self.to_date = DateEntry(to_frame, width=12, date_pattern='yyyy-mm-dd',
-                                     year=now.year, month=now.month, day=now.day)
-            self.to_date.pack(side='left', padx=5)
+            self.to_date = DateEntry(row1, width=12, date_pattern='yyyy-mm-dd')
+            self.to_date.set_date(now + timedelta(days=1))
         else:
-            # Fallback: manual date entry
-            ttk.Label(to_frame, text="Date (YYYY-MM-DD):").pack(side='left', padx=5)
-            self.to_date = ttk.Entry(to_frame, width=12)
-            self.to_date.pack(side='left', padx=5)
-            self.to_date.insert(0, (now + timedelta(days=3)).strftime("%Y-%m-%d"))
+            self.to_date = ttk.Entry(row1, width=12)
+            self.to_date.insert(0, (now + timedelta(days=1)).strftime('%Y-%m-%d'))
+        self.to_date.pack(side='left', padx=5)
         
-        # TO Time picker
-        ttk.Label(to_frame, text="Hour:").pack(side='left', padx=10)
-        self.to_hour = ttk.Spinbox(to_frame, from_=0, to=23, width=5, format="%02.0f")
-        self.to_hour.pack(side='left', padx=2)
+        self.to_hour = ttk.Spinbox(row1, from_=0, to=23, width=4)
         self.to_hour.set(now.hour)
+        self.to_hour.pack(side='left')
         
-        ttk.Label(to_frame, text=":").pack(side='left')
+        row2 = ttk.Frame(ctrl)
+        row2.pack(fill='x', padx=5, pady=5)
         
-        self.to_minute = ttk.Spinbox(to_frame, from_=0, to=59, width=5, format="%02.0f")
-        self.to_minute.pack(side='left', padx=2)
-        self.to_minute.set(0)
+        ttk.Label(row2, text="Quick:").pack(side='left')
+        ttk.Button(row2, text="+24h", command=lambda: self.quick_select(24)).pack(side='left', padx=2)
+        ttk.Button(row2, text="+72h", command=lambda: self.quick_select(72)).pack(side='left', padx=2)
+        ttk.Button(row2, text="+7d", command=lambda: self.quick_select(168)).pack(side='left', padx=2)
         
-        # Quick select buttons
-        quick_frame = ttk.Frame(date_frame)
-        quick_frame.pack(fill='x', padx=10, pady=5)
+        row3 = ttk.Frame(ctrl)
+        row3.pack(fill='x', padx=5, pady=5)
         
-        ttk.Label(quick_frame, text="Quick Select (from Start):").pack(side='left', padx=5)
-        ttk.Button(quick_frame, text="+6 hours", command=lambda: self.quick_select(6)).pack(side='left', padx=3)
-        ttk.Button(quick_frame, text="+12 hours", command=lambda: self.quick_select(12)).pack(side='left', padx=3)
-        ttk.Button(quick_frame, text="+24 hours", command=lambda: self.quick_select(24)).pack(side='left', padx=3)
-        ttk.Button(quick_frame, text="+3 days", command=lambda: self.quick_select(72)).pack(side='left', padx=3)
-        ttk.Button(quick_frame, text="+7 days", command=lambda: self.quick_select(168)).pack(side='left', padx=3)
+        self.pred_type = tk.StringVar(value='hourly')
+        ttk.Radiobutton(row3, text="Hourly", variable=self.pred_type, value='hourly').pack(side='left', padx=10)
+        ttk.Radiobutton(row3, text="Daily", variable=self.pred_type, value='daily').pack(side='left', padx=10)
         
-        # Forecast type selection
-        type_frame = ttk.Frame(date_frame)
-        type_frame.pack(fill='x', padx=10, pady=10)
+        ttk.Button(row3, text="GENERATE", command=self.run_range_predict).pack(side='left', padx=20)
+        ttk.Button(row3, text="Export CSV", command=self.export_csv).pack(side='left', padx=5)
         
-        ttk.Label(type_frame, text="Forecast Type:").pack(side='left', padx=5)
-        self.forecast_type = tk.StringVar(value="hourly")
-        ttk.Radiobutton(type_frame, text="Hourly (per-jam)", variable=self.forecast_type, 
-                        value="hourly").pack(side='left', padx=10)
-        ttk.Radiobutton(type_frame, text="Daily (per-hari)", variable=self.forecast_type, 
-                        value="daily").pack(side='left', padx=10)
-        
-        # Generate button
-        btn_frame = ttk.Frame(self.range_frame)
-        btn_frame.pack(pady=15)
-        
-        self.generate_btn = ttk.Button(btn_frame, text="Generate Forecast", 
-                                        command=self.generate_range_forecast)
-        self.generate_btn.pack(side='left', padx=10)
-        
-        ttk.Button(btn_frame, text="Clear Results", command=self.clear_range_results).pack(side='left', padx=10)
-        ttk.Button(btn_frame, text="Export to CSV", command=self.export_forecast).pack(side='left', padx=10)
-        
-        # Info label
-        self.range_info = ttk.Label(self.range_frame, text="", font=('Segoe UI', 10))
-        self.range_info.pack(pady=5)
-        
-        # Result frame
-        result_frame = ttk.LabelFrame(self.range_frame, text="Forecast Results")
-        result_frame.pack(fill='both', expand=True, padx=10, pady=5)
-        
-        self.range_result = scrolledtext.ScrolledText(result_frame, height=18, font=('Consolas', 10))
-        self.range_result.pack(fill='both', expand=True, padx=5, pady=5)
-    
-    def get_from_datetime(self):
-        """Get FROM datetime from inputs"""
-        if TKCALENDAR_AVAILABLE:
-            date = self.from_date.get_date()
-        else:
-            date = datetime.strptime(self.from_date.get(), "%Y-%m-%d").date()
-        
-        hour = int(self.from_hour.get())
-        minute = int(self.from_minute.get())
-        
-        return datetime.combine(date, datetime.min.time().replace(hour=hour, minute=minute))
-    
+        self.range_result = scrolledtext.ScrolledText(self.range_frame, height=20, font=('Consolas', 10))
+        self.range_result.pack(fill='both', expand=True, padx=10, pady=5)
+
     def quick_select(self, hours):
-        """Quick select TO date based on hours from FROM date"""
-        try:
-            start_dt = self.get_from_datetime()
-            target = start_dt + timedelta(hours=hours)
-            
-            if TKCALENDAR_AVAILABLE:
-                self.to_date.set_date(target.date())
-            else:
-                self.to_date.delete(0, tk.END)
-                self.to_date.insert(0, target.strftime("%Y-%m-%d"))
-            
-            self.to_hour.set(target.hour)
-            self.to_minute.set(target.minute)
-            
-            self.update_range_info()
-        except:
-            pass
-    
-    def update_range_info(self):
-        """Update info about selected range"""
-        try:
-            from_dt = self.get_from_datetime()
-            to_dt = self.get_to_datetime()
-            
-            delta = to_dt - from_dt
-            hours = int(delta.total_seconds() / 3600)
-            days = delta.days
-            
-            if hours > 0:
-                self.range_info.config(text=f"Duration: {hours} hours ({days} days, {hours % 24} hours)")
-            else:
-                self.range_info.config(text="Invalid range: TO must be after FROM")
-        except:
-            self.range_info.config(text="")
-    
-    def create_hourly_tab(self):
-        """Create Single Hourly Prediction Tab"""
-        ttk.Label(self.hourly_frame, text="Single Hour Prediction",
-                  font=('Segoe UI', 14, 'bold')).pack(pady=10)
-        
-        # Time selection
-        time_frame = ttk.LabelFrame(self.hourly_frame, text="Target Time")
-        time_frame.pack(fill='x', padx=10, pady=5)
-        
-        row1 = ttk.Frame(time_frame)
-        row1.pack(fill='x', padx=5, pady=10)
-        
-        ttk.Label(row1, text="Hour (0-23):").pack(side='left', padx=5)
-        self.single_hour = ttk.Spinbox(row1, from_=0, to=23, width=8)
-        self.single_hour.pack(side='left', padx=5)
-        self.single_hour.set(datetime.now().hour)
-        
-        ttk.Label(row1, text="Month:").pack(side='left', padx=15)
-        self.single_month = ttk.Spinbox(row1, from_=1, to=12, width=8)
-        self.single_month.pack(side='left', padx=5)
-        self.single_month.set(datetime.now().month)
-        
-        # Feature values (advanced)
-        adv_frame = ttk.LabelFrame(self.hourly_frame, text="Advanced: Current Conditions (Optional)")
-        adv_frame.pack(fill='x', padx=10, pady=5)
-        
-        self.hourly_inputs = {}
-        
-        # Temperature
-        row2 = ttk.Frame(adv_frame)
-        row2.pack(fill='x', padx=5, pady=3)
-        ttk.Label(row2, text="Current Temp (C):").pack(side='left', padx=5)
-        self.hourly_inputs['temp_lag_1'] = ttk.Entry(row2, width=10)
-        self.hourly_inputs['temp_lag_1'].pack(side='left', padx=5)
-        self.hourly_inputs['temp_lag_1'].insert(0, "28.5")
-        
-        ttk.Label(row2, text="Humidity (%):").pack(side='left', padx=15)
-        self.hourly_inputs['humidity_lag_1'] = ttk.Entry(row2, width=10)
-        self.hourly_inputs['humidity_lag_1'].pack(side='left', padx=5)
-        self.hourly_inputs['humidity_lag_1'].insert(0, "75")
-        
-        row3 = ttk.Frame(adv_frame)
-        row3.pack(fill='x', padx=5, pady=3)
-        ttk.Label(row3, text="Wind Speed (km/h):").pack(side='left', padx=5)
-        self.hourly_inputs['windspeed_lag_1'] = ttk.Entry(row3, width=10)
-        self.hourly_inputs['windspeed_lag_1'].pack(side='left', padx=5)
-        self.hourly_inputs['windspeed_lag_1'].insert(0, "5.2")
-        
-        ttk.Label(row3, text="Pressure (hPa):").pack(side='left', padx=15)
-        self.hourly_inputs['sealevelpressure_lag_1'] = ttk.Entry(row3, width=10)
-        self.hourly_inputs['sealevelpressure_lag_1'].pack(side='left', padx=5)
-        self.hourly_inputs['sealevelpressure_lag_1'].insert(0, "1010.5")
-        
-        # Buttons
-        btn_frame = ttk.Frame(self.hourly_frame)
-        btn_frame.pack(pady=10)
-        ttk.Button(btn_frame, text="Predict", command=self.predict_single_hourly).pack(side='left', padx=5)
-        ttk.Button(btn_frame, text="Reset", command=self.reset_hourly).pack(side='left', padx=5)
-        
-        # Result
-        result_frame = ttk.LabelFrame(self.hourly_frame, text="Prediction Result")
-        result_frame.pack(fill='both', expand=True, padx=10, pady=5)
-        self.hourly_result = scrolledtext.ScrolledText(result_frame, height=12, font=('Consolas', 11))
-        self.hourly_result.pack(fill='both', expand=True, padx=5, pady=5)
-    
-    def create_daily_tab(self):
-        """Create Single Daily Prediction Tab"""
-        ttk.Label(self.daily_frame, text="Single Day Prediction",
-                  font=('Segoe UI', 14, 'bold')).pack(pady=10)
-        
-        # Date selection
-        date_frame = ttk.LabelFrame(self.daily_frame, text="Target Date")
-        date_frame.pack(fill='x', padx=10, pady=5)
-        
-        row1 = ttk.Frame(date_frame)
-        row1.pack(fill='x', padx=5, pady=10)
-        
-        now = datetime.now()
+        dt = self.get_dt(self.from_date, self.from_hour)
+        target = dt + timedelta(hours=hours)
         if TKCALENDAR_AVAILABLE:
-            ttk.Label(row1, text="Date:").pack(side='left', padx=5)
-            self.daily_date = DateEntry(row1, width=12, date_pattern='yyyy-mm-dd')
-            self.daily_date.pack(side='left', padx=5)
+            self.to_date.set_date(target)
         else:
-            ttk.Label(row1, text="Month:").pack(side='left', padx=5)
-            self.daily_month = ttk.Spinbox(row1, from_=1, to=12, width=8)
-            self.daily_month.pack(side='left', padx=5)
-            self.daily_month.set(now.month)
-            
-            ttk.Label(row1, text="Day:").pack(side='left', padx=15)
-            self.daily_day = ttk.Spinbox(row1, from_=1, to=31, width=8)
-            self.daily_day.pack(side='left', padx=5)
-            self.daily_day.set(now.day)
-        
-        # Advanced options
-        adv_frame = ttk.LabelFrame(self.daily_frame, text="Advanced: Yesterday's Conditions (Optional)")
-        adv_frame.pack(fill='x', padx=10, pady=5)
-        
-        self.daily_inputs = {}
-        
-        row2 = ttk.Frame(adv_frame)
-        row2.pack(fill='x', padx=5, pady=3)
-        ttk.Label(row2, text="Yesterday Temp Min:").pack(side='left', padx=5)
-        self.daily_inputs['temp_min_lag_1'] = ttk.Entry(row2, width=10)
-        self.daily_inputs['temp_min_lag_1'].pack(side='left', padx=5)
-        self.daily_inputs['temp_min_lag_1'].insert(0, "22.5")
-        
-        ttk.Label(row2, text="Temp Max:").pack(side='left', padx=5)
-        self.daily_inputs['temp_max_lag_1'] = ttk.Entry(row2, width=10)
-        self.daily_inputs['temp_max_lag_1'].pack(side='left', padx=5)
-        self.daily_inputs['temp_max_lag_1'].insert(0, "31.0")
-        
-        ttk.Label(row2, text="Humidity Avg:").pack(side='left', padx=5)
-        self.daily_inputs['humidity_avg_lag_1'] = ttk.Entry(row2, width=10)
-        self.daily_inputs['humidity_avg_lag_1'].pack(side='left', padx=5)
-        self.daily_inputs['humidity_avg_lag_1'].insert(0, "78")
-        
-        # Buttons
-        btn_frame = ttk.Frame(self.daily_frame)
-        btn_frame.pack(pady=10)
-        ttk.Button(btn_frame, text="Predict", command=self.predict_single_daily).pack(side='left', padx=5)
-        ttk.Button(btn_frame, text="Reset", command=self.reset_daily).pack(side='left', padx=5)
-        
-        # Result
-        result_frame = ttk.LabelFrame(self.daily_frame, text="Prediction Result")
-        result_frame.pack(fill='both', expand=True, padx=10, pady=5)
-        self.daily_result = scrolledtext.ScrolledText(result_frame, height=12, font=('Consolas', 11))
-        self.daily_result.pack(fill='both', expand=True, padx=5, pady=5)
-    
-    def create_info_tab(self):
-        """Create Model Info Tab"""
-        ttk.Label(self.info_frame, text="Model Information",
-                  font=('Segoe UI', 14, 'bold')).pack(pady=10)
-        
-        self.info_text = scrolledtext.ScrolledText(self.info_frame, height=25, font=('Consolas', 10))
-        self.info_text.pack(fill='both', expand=True, padx=10, pady=5)
-        
-        ttk.Button(self.info_frame, text="Refresh", command=lambda: self.show_model_info()).pack(pady=5)
+            self.to_date.delete(0, tk.END)
+            self.to_date.insert(0, target.strftime('%Y-%m-%d'))
+        self.to_hour.set(target.hour)
 
-    def show_model_info(self):
-        """Show full details of the loaded model"""
+    def get_dt(self, d_widget, h_widget):
+        if TKCALENDAR_AVAILABLE:
+            d = d_widget.get_date()
+        else:
+            d = datetime.strptime(d_widget.get(), '%Y-%m-%d').date()
+        return datetime.combine(d, datetime.min.time()) + timedelta(hours=int(h_widget.get()))
+
+    def run_range_predict(self):
         if not self.model:
-            self.info_text.delete(1.0, tk.END)
-            self.info_text.insert(tk.END, "No model loaded. Please load a model first.")
-            return
-
-        self.info_text.delete(1.0, tk.END)
-        lines = []
+            return messagebox.showerror("Error", "Load model first")
         
-        # 1. Basic Info
-        lines.append("=" * 60)
-        lines.append(f"MODEL INFO: {os.path.basename(self.model_path)}")
-        lines.append("=" * 60)
-        lines.append(f"Type:         {self.model.get('type', 'Unknown')}")
-        lines.append(f"Version:      {self.model.get('version', 'Unknown')}")
-        lines.append(f"Trained Date: {self.model.get('trained_date', 'Unknown')}")
-        lines.append("-" * 60)
+        start = self.get_dt(self.from_date, self.from_hour)
+        end = self.get_dt(self.to_date, self.to_hour)
         
-        # --- Helper to format lists ---
-        def format_list(title, items, indent=2):
-            res = [f"{' ' * indent}{title}:"]
-            for i, item in enumerate(items):
-                res.append(f"{' ' * (indent + 2)}- {item}")
-            return res
-
-        def format_dict(title, data, indent=2):
-            res = [f"{' ' * indent}{title}:"]
-            for k, v in data.items():
-                res.append(f"{' ' * (indent + 2)}{k}: {v}")
-            return res
-
-        def get_classes(encoder):
-            if hasattr(encoder, 'classes_'):
-                return list(encoder.classes_)
-            return "N/A"
-
-        # 2. Encoders & Mappings (Global/Combined level)
-        lines.append("\n[GLOBAL MAPPINGS & ENCODERS]")
+        if end <= start:
+            return messagebox.showerror("Error", "End must be > Start")
         
-        # Weather Code to Rain
-        if 'weather_code_to_rain' in self.model:
-            lines.extend(format_dict("Weather Code -> Rain (mm)", self.model['weather_code_to_rain']))
+        ptype = self.pred_type.get()
+        pkg = self.model[ptype]
         
-        # Encoders
-        if 'label_encoder_hourly' in self.model:
-            le = self.model['label_encoder_hourly']
-            lines.extend(format_list("Label Encoder weather_code (Hourly Targets)", get_classes(le)))
-            
-        if 'label_encoder_daily' in self.model:
-            le = self.model['label_encoder_daily']
-            lines.extend(format_list("Label Encoder weather_code_dominant (Daily Targets)", get_classes(le)))
-            
-        if 'label_encoder_conditions' in self.model:
-            le = self.model['label_encoder_conditions']
-            lines.extend(format_list("Label Encoder (Conditions)", get_classes(le)))
-
-        # 3. Hourly Component
-        lines.append("\n" + "-" * 60)
-        lines.append("[HOURLY MODEL COMPONENT]")
+        if not pkg['regressor'] or not pkg['classifier']:
+            return messagebox.showerror("Error", f"Model missing {ptype} components")
         
-        if self.model.get('hourly'):
-            h_data = self.model['hourly']
-            h_reg = h_data.get('regressor')
-            h_clf = h_data.get('classifier')
-            
-            # Check for package-level specific items if not at global
-            if 'label_encoder' in h_data:
-                le = h_data['label_encoder']
-                lines.extend(format_list("Label Encoder (Local)", get_classes(le)))
-            
-            if h_reg:
-                lines.append(f"  Regressor:  AVAILABLE ({h_reg.__class__.__name__})")
-                if hasattr(h_reg, 'n_estimators'): lines.append(f"    - n_estimators: {h_reg.n_estimators}")
-            else:
-                lines.append("  Regressor:  NOT AVAILABLE")
-                
-            if h_clf:
-                lines.append(f"  Classifier: AVAILABLE ({h_clf.__class__.__name__})")
-            else:
-                lines.append("  Classifier: NOT AVAILABLE")
-                
-            if h_data.get('feature_columns'):
-                lines.extend(format_list("Features (Input)", h_data['feature_columns']))
-            
-            if h_data.get('target_regression'):
-                lines.extend(format_list("Target (Regression)", h_data['target_regression'] if isinstance(h_data['target_regression'], list) else [h_data['target_regression']]))
-            
-            if h_data.get('target_classification'):
-                lines.append(f"  Target (Classification): {h_data['target_classification']}")
-
-        # 4. Daily Component
-        lines.append("\n" + "-" * 60)
-        lines.append("[DAILY MODEL COMPONENT]")
-        
-        if self.model.get('daily'):
-            d_data = self.model['daily']
-            d_reg = d_data.get('regressor')
-            d_clf = d_data.get('classifier')
-
-            if 'label_encoder' in d_data:
-                le = d_data['label_encoder']
-                lines.extend(format_list("Label Encoder (Local)", get_classes(le)))
-            
-            if d_reg:
-                lines.append(f"  Regressor:  AVAILABLE ({d_reg.__class__.__name__})")
-            else:
-                lines.append("  Regressor:  NOT AVAILABLE")
-                
-            if d_clf:
-                lines.append(f"  Classifier: AVAILABLE ({d_clf.__class__.__name__})")
-            else:
-                lines.append("  Classifier: NOT AVAILABLE")
-
-            if d_data.get('feature_columns'):
-                lines.extend(format_list("Features (Input)", d_data['feature_columns']))
-            
-            if d_data.get('target_regression'):
-                lines.extend(format_list("Target (Regression)", d_data['target_regression'] if isinstance(d_data['target_regression'], list) else [d_data['target_regression']]))
-
-            if d_data.get('target_classification'):
-                 lines.append(f"  Target (Classification): {d_data['target_classification']}")
-
-        # 5. Metadata Reference
-        lines.append("\n" + "=" * 60)
-        lines.append("REFERENCE: Weather Codes")
-        lines.append("-" * 60)
-        lines.append(f"{'Code':<5} | {'Condition':<20} | {'Rain (mm)'}")
-        for code, cond in WEATHER_CODE_TO_CONDITION.items():
-            rain = WEATHER_CODE_TO_RAIN.get(code, 0)
-            lines.append(f"{code:<5} | {cond:<20} | {rain}")
-            
-        
-        self.info_text.insert(tk.END, "\n".join(lines))
-    
-    def refresh_from_time(self): # Note: No longer used but kept for compatibility if needed
-        pass
-    
-    def get_to_datetime(self):
-        """Get TO datetime from inputs"""
-        if TKCALENDAR_AVAILABLE:
-            date = self.to_date.get_date()
+        if ptype == 'hourly':
+            self.predict_hourly_recursive(start, end)
         else:
-            date = datetime.strptime(self.to_date.get(), "%Y-%m-%d").date()
-        
-        hour = int(self.to_hour.get())
-        minute = int(self.to_minute.get())
-        
-        return datetime.combine(date, datetime.min.time().replace(hour=hour, minute=minute))
-    
-    def generate_range_forecast(self):
-        """Generate forecast for date range"""
-        if self.model is None:
-            messagebox.showerror("Error", "Model not loaded!")
-            return
-        
-        try:
-            from_dt = self.get_from_datetime()
-            to_dt = self.get_to_datetime()
-            
-            if to_dt <= from_dt:
-                messagebox.showerror("Error", "TO date must be after FROM date!")
-                return
-            
-            forecast_type = self.forecast_type.get()
-            
-            if forecast_type == "hourly":
-                self.generate_hourly_range(from_dt, to_dt)
-            else:
-                self.generate_daily_range(from_dt, to_dt)
-                
-        except Exception as e:
-            messagebox.showerror("Error", f"Forecast failed: {str(e)}")
-    
-    def generate_hourly_range(self, from_dt, to_dt):
-        """Generate hourly forecast for range"""
-        # Check if hourly model exists
-        if not self.model['hourly']['regressor'] or not self.model['hourly']['classifier']:
-             messagebox.showerror("Error", "Current model does not support Hourly prediction (missing components)")
-             return
+            self.predict_daily_recursive(start, end)
 
-        delta = to_dt - from_dt
-        n_hours = int(delta.total_seconds() / 3600)
-        
-        if n_hours > 168:
-            if not messagebox.askyesno("Warning", f"Forecasting {n_hours} hours may be slow. Continue?"):
-                return
+    def predict_hourly_recursive(self, start, end):
+        """Recursive forecast for hourly using lag features"""
+        hours = int((end - start).total_seconds() / 3600)
         
         reg = self.model['hourly']['regressor']
         clf = self.model['hourly']['classifier']
         features = self.hourly_features
         
-        # Build initial features
-        current = self.default_hourly.copy()
-        current['hour'] = from_dt.hour
-        current['month'] = from_dt.month
+        # Initialize state from defaults
+        state = self.default_hourly.copy()
         
-        predictions = []
-        current_dt = from_dt
+        # Storage for rolling calculation (last 24 values)
+        temp_history = [state['temp_lag_1']] * 24
+        humid_history = [state['humidity_lag_1']] * 24
+        wind_history = [state['windspeed_lag_1']] * 24
         
-        self.status_var.set("Generating hourly forecast...")
-        self.root.update()
+        self.predictions_cache = []
+        lines = [f"{'Time':<18} | {'Temp':>6} | {'Humid':>6} | {'Wind':>6} | {'Press':>8} | Condition"]
+        lines.append("-" * 70)
         
-        for i in range(n_hours):
-            current['hour'] = current_dt.hour
-            current['month'] = current_dt.month
+        current = start
+        for i in range(hours):
+            state['hour'] = current.hour
+            state['month'] = current.month
             
-            X = np.array([[current.get(f, 0) for f in features]])
-            reg_pred = reg.predict(X)[0]
-            clf_pred = clf.predict(X)[0]
+            # Build input
+            X = pd.DataFrame([[state.get(f, 0) for f in features]], columns=features)
             
-            weather_code = int(clf_pred)
-            predictions.append({
-                'datetime': current_dt.strftime("%Y-%m-%d %H:%M"),
-                'temp': reg_pred[0],
-                'humidity': reg_pred[1],
-                'windspeed': reg_pred[2],
-                'pressure': reg_pred[3],
-                'weather_code': weather_code,
-                'condition': WEATHER_CODE_TO_CONDITION.get(weather_code, 'Unknown'),
-                'rain': WEATHER_CODE_TO_RAIN.get(weather_code, 0.0)
+            y_reg = reg.predict(X)[0]  # [temp, humid, wind, press]
+            y_clf = clf.predict(X)[0]
+            
+            code = int(y_clf)
+            cond = WEATHER_CODE_TO_CONDITION.get(code, str(code))
+            
+            lines.append(f"{current.strftime('%Y-%m-%d %H:%M'):<18} | {y_reg[0]:>6.1f} | {y_reg[1]:>6.1f} | {y_reg[2]:>6.1f} | {y_reg[3]:>8.1f} | {cond}")
+            
+            self.predictions_cache.append({
+                'Time': current,
+                'Temp': y_reg[0], 'Humidity': y_reg[1],
+                'Wind': y_reg[2], 'Pressure': y_reg[3],
+                'Code': code, 'Condition': cond
             })
             
-            # Update for next iteration
-            current['temp_lag_1'] = reg_pred[0]
-            current['humidity_lag_1'] = reg_pred[1]
-            current['windspeed_lag_1'] = reg_pred[2]
-            current['sealevelpressure_lag_1'] = reg_pred[3]
+            # --- Update State (Recursive Step) ---
+            # Shift history
+            temp_history.pop(0)
+            temp_history.append(y_reg[0])
+            humid_history.pop(0)
+            humid_history.append(y_reg[1])
+            wind_history.pop(0)
+            wind_history.append(y_reg[2])
             
-            current_dt += timedelta(hours=1)
+            # Update lag_1
+            state['temp_lag_1'] = y_reg[0]
+            state['humidity_lag_1'] = y_reg[1]
+            state['windspeed_lag_1'] = y_reg[2]
+            state['sealevelpressure_lag_1'] = y_reg[3]
+            
+            # Update lag_24 (value from 24 hours ago in history)
+            state['temp_lag_24'] = temp_history[0]
+            state['humidity_lag_24'] = humid_history[0]
+            state['windspeed_lag_24'] = wind_history[0]
+            
+            # Update rolling_24 (average of history)
+            state['temp_rolling_24'] = np.mean(temp_history)
+            state['humidity_rolling_24'] = np.mean(humid_history)
+            state['windspeed_rolling_24'] = np.mean(wind_history)
+            
+            current += timedelta(hours=1)
         
-        # Display results
-        self.range_result.delete(1.0, tk.END)
-        result = []
-        result.append("=" * 85)
-        result.append(f"HOURLY FORECAST: {from_dt.strftime('%Y-%m-%d %H:%M')} to {to_dt.strftime('%Y-%m-%d %H:%M')}")
-        result.append(f"Model: {os.path.basename(self.model_path)}")
-        result.append(f"Total: {n_hours} hours")
-        result.append("=" * 85)
-        result.append(f"{'DateTime':<18} | {'Temp':>6} | {'Humid':>6} | {'Wind':>6} | {'Press':>8} | {'Condition':<16} | {'Rain'}")
-        result.append("-" * 85)
-        
-        for p in predictions:
-            result.append(f"{p['datetime']:<18} | {p['temp']:>5.1f}C | {p['humidity']:>5.1f}% | {p['windspeed']:>5.1f} | {p['pressure']:>7.1f} | {p['condition']:<16} | {p['rain']:.1f}mm")
-        
-        self.range_result.insert(tk.END, "\n".join(result))
-        self.status_var.set(f"Hourly forecast generated: {n_hours} hours")
-        self.predictions_cache = predictions
-    
-    def generate_daily_range(self, from_dt, to_dt):
-        """Generate daily forecast for range"""
-        # Check if daily model exists
-        if not self.model['daily']['regressor'] or not self.model['daily']['classifier']:
-             messagebox.showerror("Error", "Current model does not support Daily prediction (missing components)")
-             return
-             
-        n_days = (to_dt.date() - from_dt.date()).days + 1
+        self.range_result.delete("1.0", tk.END)
+        self.range_result.insert(tk.END, "\n".join(lines))
+        self.status_var.set(f"Generated {hours} hourly forecasts")
+
+    def predict_daily_recursive(self, start, end):
+        """Recursive forecast for daily"""
+        days = (end.date() - start.date()).days + 1
         
         reg = self.model['daily']['regressor']
         clf = self.model['daily']['classifier']
         features = self.daily_features
         
-        current = self.default_daily.copy()
-        predictions = []
-        current_date = from_dt.date()
+        state = self.default_daily.copy()
         
-        self.status_var.set("Generating daily forecast...")
-        self.root.update()
+        # Track last 7 days for lag_7 calculation
+        min_history = [state['temp_min_lag_1']] * 7
+        max_history = [state['temp_max_lag_1']] * 7
+        mean_history = [state['temp_mean_lag_1']] * 7
         
-        for i in range(n_days):
-            current['month'] = current_date.month
-            current['day'] = current_date.day
+        self.predictions_cache = []
+        lines = [f"{'Date':<12} | {'Min':>5} | {'Max':>5} | {'Mean':>5} | {'Hum':>5} | {'Wind':>5} | Condition"]
+        lines.append("-" * 70)
+        
+        current = start.date()
+        for i in range(days):
+            state['month'] = current.month
+            state['day'] = current.day
             
-            X = np.array([[current.get(f, 0) for f in features]])
-            reg_pred = reg.predict(X)[0]
-            clf_pred = clf.predict(X)[0]
+            X = pd.DataFrame([[state.get(f, 0) for f in features]], columns=features)
             
-            weather_code = int(clf_pred)
-            predictions.append({
-                'date': current_date.strftime("%Y-%m-%d"),
-                'temp_min': reg_pred[0],
-                'temp_max': reg_pred[1],
-                'temp_mean': reg_pred[2],
-                'humidity': reg_pred[3],
-                'windspeed': reg_pred[4],
-                'pressure': reg_pred[5],
-                'weather_code': weather_code,
-                'condition': WEATHER_CODE_TO_CONDITION.get(weather_code, 'Unknown')
+            y_reg = reg.predict(X)[0]  # [min, max, mean, humid, wind, press]
+            y_clf = clf.predict(X)[0]
+            
+            code = int(y_clf)
+            cond = WEATHER_CODE_TO_CONDITION.get(code, str(code))
+            
+            lines.append(f"{current.strftime('%Y-%m-%d'):<12} | {y_reg[0]:>5.1f} | {y_reg[1]:>5.1f} | {y_reg[2]:>5.1f} | {y_reg[3]:>5.1f} | {y_reg[4]:>5.1f} | {cond}")
+            
+            self.predictions_cache.append({
+                'Date': current,
+                'TempMin': y_reg[0], 'TempMax': y_reg[1], 'TempMean': y_reg[2],
+                'Humidity': y_reg[3], 'Wind': y_reg[4], 'Pressure': y_reg[5],
+                'Condition': cond
             })
             
-            # Update for next day
-            current['temp_min_lag_1'] = reg_pred[0]
-            current['temp_max_lag_1'] = reg_pred[1]
-            current['temp_mean_lag_1'] = reg_pred[2]
-            current['humidity_avg_lag_1'] = reg_pred[3]
-            current['windspeed_avg_lag_1'] = reg_pred[4]
-            current['pressure_avg_lag_1'] = reg_pred[5]
+            # --- Update State (Recursive) ---
+            min_history.pop(0)
+            min_history.append(y_reg[0])
+            max_history.pop(0)
+            max_history.append(y_reg[1])
+            mean_history.pop(0)
+            mean_history.append(y_reg[2])
             
-            current_date += timedelta(days=1)
+            state['temp_min_lag_1'] = y_reg[0]
+            state['temp_max_lag_1'] = y_reg[1]
+            state['temp_mean_lag_1'] = y_reg[2]
+            state['humidity_avg_lag_1'] = y_reg[3]
+            state['windspeed_avg_lag_1'] = y_reg[4]
+            state['pressure_avg_lag_1'] = y_reg[5]
+            
+            state['temp_min_lag_7'] = min_history[0]
+            state['temp_max_lag_7'] = max_history[0]
+            state['temp_mean_lag_7'] = mean_history[0]
+            
+            state['rain_total_lag_1'] = self.model['weather_code_to_rain'].get(code, 0.0)
+            
+            current += timedelta(days=1)
         
-        # Display
-        self.range_result.delete(1.0, tk.END)
-        result = []
-        result.append("=" * 90)
-        result.append(f"DAILY FORECAST: {from_dt.strftime('%Y-%m-%d')} to {to_dt.strftime('%Y-%m-%d')}")
-        result.append(f"Model: {os.path.basename(self.model_path)}")
-        result.append(f"Total: {n_days} days")
-        result.append("=" * 90)
-        result.append(f"{'Date':<12} | {'Min':>6} | {'Max':>6} | {'Mean':>6} | {'Humid':>6} | {'Wind':>6} | {'Condition'}")
-        result.append("-" * 90)
+        self.range_result.delete("1.0", tk.END)
+        self.range_result.insert(tk.END, "\n".join(lines))
+        self.status_var.set(f"Generated {days} daily forecasts")
+
+    def export_csv(self):
+        if not self.predictions_cache:
+            return
+        f = filedialog.asksaveasfilename(defaultextension=".csv")
+        if f:
+            pd.DataFrame(self.predictions_cache).to_csv(f, index=False)
+            messagebox.showinfo("OK", "Exported")
+
+    # --- Tab 2: Single Hourly ---
+    def create_hourly_tab(self):
+        ttk.Label(self.hourly_frame, text="Single Hour Prediction", font=('Segoe UI', 14, 'bold')).pack(pady=10)
         
-        for p in predictions:
-            result.append(f"{p['date']:<12} | {p['temp_min']:>5.1f}C | {p['temp_max']:>5.1f}C | {p['temp_mean']:>5.1f}C | {p['humidity']:>5.1f}% | {p['windspeed']:>5.1f} | {p['condition']}")
+        self.h_inputs = {}
+        f = ttk.LabelFrame(self.hourly_frame, text="Input Features")
+        f.pack(fill='x', padx=10, pady=5)
         
-        self.range_result.insert(tk.END, "\n".join(result))
-        self.status_var.set(f"Daily forecast generated: {n_days} days")
-        self.predictions_cache = predictions
-    
-    def clear_range_results(self):
-        self.range_result.delete(1.0, tk.END)
-        self.predictions_cache = []
-    
-    def export_forecast(self):
-        """Export forecast to CSV"""
-        if not hasattr(self, 'predictions_cache') or not self.predictions_cache:
-            messagebox.showwarning("Warning", "No forecast data to export!")
+        row = 0
+        for feat in self.hourly_features:
+            ttk.Label(f, text=f"{feat}:").grid(row=row, column=0, sticky='w', padx=5, pady=2)
+            e = ttk.Entry(f, width=12)
+            e.insert(0, str(self.default_hourly.get(feat, 0)))
+            e.grid(row=row, column=1, padx=5, pady=2)
+            self.h_inputs[feat] = e
+            row += 1
+        
+        ttk.Button(self.hourly_frame, text="PREDICT", command=self.predict_single_hourly).pack(pady=10)
+        self.h_result = ttk.Label(self.hourly_frame, text="...", font=('Segoe UI', 12))
+        self.h_result.pack()
+
+    def predict_single_hourly(self):
+        if not self.model or not self.model['hourly']['regressor']:
+            return
+        vals = {k: float(e.get()) for k, e in self.h_inputs.items()}
+        X = pd.DataFrame([[vals.get(f, 0) for f in self.hourly_features]], columns=self.hourly_features)
+        
+        y_reg = self.model['hourly']['regressor'].predict(X)[0]
+        y_clf = self.model['hourly']['classifier'].predict(X)[0]
+        
+        cond = WEATHER_CODE_TO_CONDITION.get(int(y_clf), str(y_clf))
+        self.h_result.config(text=f"Temp: {y_reg[0]:.1f}C | Humid: {y_reg[1]:.1f}% | Wind: {y_reg[2]:.1f} | {cond}")
+
+    # --- Tab 3: Single Daily ---
+    def create_daily_tab(self):
+        ttk.Label(self.daily_frame, text="Single Day Prediction", font=('Segoe UI', 14, 'bold')).pack(pady=10)
+        
+        self.d_inputs = {}
+        f = ttk.LabelFrame(self.daily_frame, text="Input Features")
+        f.pack(fill='x', padx=10, pady=5)
+        
+        row = 0
+        for feat in self.daily_features:
+            ttk.Label(f, text=f"{feat}:").grid(row=row, column=0, sticky='w', padx=5, pady=2)
+            e = ttk.Entry(f, width=12)
+            e.insert(0, str(self.default_daily.get(feat, 0)))
+            e.grid(row=row, column=1, padx=5, pady=2)
+            self.d_inputs[feat] = e
+            row += 1
+        
+        ttk.Button(self.daily_frame, text="PREDICT", command=self.predict_single_daily).pack(pady=10)
+        self.d_result = ttk.Label(self.daily_frame, text="...", font=('Segoe UI', 12))
+        self.d_result.pack()
+
+    def predict_single_daily(self):
+        if not self.model or not self.model['daily']['regressor']:
+            return
+        vals = {k: float(e.get()) for k, e in self.d_inputs.items()}
+        X = pd.DataFrame([[vals.get(f, 0) for f in self.daily_features]], columns=self.daily_features)
+        
+        y_reg = self.model['daily']['regressor'].predict(X)[0]
+        y_clf = self.model['daily']['classifier'].predict(X)[0]
+        
+        cond = WEATHER_CODE_TO_CONDITION.get(int(y_clf), str(y_clf))
+        self.d_result.config(text=f"Min: {y_reg[0]:.1f} | Max: {y_reg[1]:.1f} | Mean: {y_reg[2]:.1f} | {cond}")
+
+    # --- Tab 4: Info ---
+    def create_info_tab(self):
+        self.info_text = scrolledtext.ScrolledText(self.info_frame, font=('Consolas', 10))
+        self.info_text.pack(fill='both', expand=True, padx=5, pady=5)
+
+    def show_model_info(self):
+        self.info_text.delete("1.0", tk.END)
+        if not self.model:
             return
         
-        try:
-            filename = filedialog.asksaveasfilename(
-                title="Save Forecast",
-                defaultextension=".csv",
-                initialfile=f"forecast_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                filetypes=(("CSV Files", "*.csv"), ("All Files", "*.*"))
-            )
-            
-            if not filename:
-                return
-
-            import csv
-            with open(filename, 'w', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=self.predictions_cache[0].keys())
-                writer.writeheader()
-                writer.writerows(self.predictions_cache)
-            
-            messagebox.showinfo("Success", f"Forecast exported to {filename}")
-            self.status_var.set(f"Exported: {filename}")
-        except Exception as e:
-            messagebox.showerror("Error", f"Export failed: {str(e)}")
-    
-    def predict_single_hourly(self):
-        """Single hour prediction"""
-        if self.model is None or not self.model['hourly']['regressor']:
-             messagebox.showerror("Error", "Model not loaded or does not support Hourly prediction!")
-             return
+        lines = ["=== Model Info ===", f"Path: {self.model_path}", ""]
         
-        try:
-            features = self.hourly_features
-            current = self.default_hourly.copy()
-            current['hour'] = float(self.single_hour.get())
-            current['month'] = float(self.single_month.get())
-            
-            # Override with user inputs
-            for key, widget in self.hourly_inputs.items():
-                try:
-                    current[key] = float(widget.get())
-                except:
-                    pass
-            
-            X = np.array([[current.get(f, 0) for f in features]])
-            
-            reg = self.model['hourly']['regressor']
-            clf = self.model['hourly']['classifier']
-            
-            reg_pred = reg.predict(X)[0]
-            clf_pred = clf.predict(X)[0]
-            
-            weather_code = int(clf_pred)
-            
-            self.hourly_result.delete(1.0, tk.END)
-            result = []
-            result.append("=" * 45)
-            result.append(f"HOURLY PREDICTION ({os.path.basename(self.model_path)})")
-            result.append("=" * 45)
-            result.append(f"\nHour: {int(current['hour'])}, Month: {int(current['month'])}")
-            result.append("\n--- Predictions ---")
-            result.append(f"  Temperature:  {reg_pred[0]:.1f} C")
-            result.append(f"  Humidity:     {reg_pred[1]:.1f} %")
-            result.append(f"  Wind Speed:   {reg_pred[2]:.1f} km/h")
-            result.append(f"  Pressure:     {reg_pred[3]:.1f} hPa")
-            result.append(f"  Weather:      {WEATHER_CODE_TO_CONDITION.get(weather_code, 'Unknown')}")
-            result.append(f"  Rain:         {WEATHER_CODE_TO_RAIN.get(weather_code, 0):.1f} mm")
-            
-            self.hourly_result.insert(tk.END, "\n".join(result))
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-    
-    def predict_single_daily(self):
-        """Single day prediction"""
-        if self.model is None or not self.model['daily']['regressor']:
-             messagebox.showerror("Error", "Model not loaded or does not support Daily prediction!")
-             return
+        lines.append("[HOURLY]")
+        if self.model['hourly']['regressor']:
+            lines.append(f"  Regressor: {self.model['hourly']['regressor'].__class__.__name__}")
+        if self.model['hourly']['classifier']:
+            lines.append(f"  Classifier: {self.model['hourly']['classifier'].__class__.__name__}")
+        lines.append(f"  Features: {self.hourly_features}")
         
-        try:
-            features = self.daily_features
-            current = self.default_daily.copy()
-            
-            if TKCALENDAR_AVAILABLE:
-                date = self.daily_date.get_date()
-                current['month'] = float(date.month)
-                current['day'] = float(date.day)
-            else:
-                current['month'] = float(self.daily_month.get())
-                current['day'] = float(self.daily_day.get())
-            
-            # Override with user inputs
-            for key, widget in self.daily_inputs.items():
-                try:
-                    current[key] = float(widget.get())
-                except:
-                    pass
-            
-            X = np.array([[current.get(f, 0) for f in features]])
-            
-            reg = self.model['daily']['regressor']
-            clf = self.model['daily']['classifier']
-            
-            reg_pred = reg.predict(X)[0]
-            clf_pred = clf.predict(X)[0]
-            
-            weather_code = int(clf_pred)
-            
-            self.daily_result.delete(1.0, tk.END)
-            result = []
-            result.append("=" * 45)
-            result.append(f"DAILY PREDICTION ({os.path.basename(self.model_path)})")
-            result.append("=" * 45)
-            result.append(f"\nDate: {int(current['month'])}/{int(current['day'])}")
-            result.append("\n--- Predictions ---")
-            result.append(f"  Temp Min:     {reg_pred[0]:.1f} C")
-            result.append(f"  Temp Max:     {reg_pred[1]:.1f} C")
-            result.append(f"  Temp Mean:    {reg_pred[2]:.1f} C")
-            result.append(f"  Humidity:     {reg_pred[3]:.1f} %")
-            result.append(f"  Wind Speed:   {reg_pred[4]:.1f} km/h")
-            result.append(f"  Pressure:     {reg_pred[5]:.1f} hPa")
-            result.append(f"  Weather:      {WEATHER_CODE_TO_CONDITION.get(weather_code, 'Unknown')}")
-            
-            self.daily_result.insert(tk.END, "\n".join(result))
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-    
-    def reset_hourly(self):
-        """Reset hourly inputs"""
-        for key, widget in self.hourly_inputs.items():
-            widget.delete(0, tk.END)
-            widget.insert(0, str(self.default_hourly.get(key.replace('lag_1', 'lag_1'), 0)))
-        self.hourly_result.delete(1.0, tk.END)
-
-    def reset_daily(self):
-        """Reset daily inputs"""
-        for key, widget in self.daily_inputs.items():
-            widget.delete(0, tk.END)
-            widget.insert(0, str(self.default_daily.get(key.replace('lag_1', 'lag_1'), 0)))
-        self.daily_result.delete(1.0, tk.END)
+        lines.append("\n[DAILY]")
+        if self.model['daily']['regressor']:
+            lines.append(f"  Regressor: {self.model['daily']['regressor'].__class__.__name__}")
+        if self.model['daily']['classifier']:
+            lines.append(f"  Classifier: {self.model['daily']['classifier'].__class__.__name__}")
+        lines.append(f"  Features: {self.daily_features}")
+        
+        lines.append("\n[WEATHER CODES]")
+        for code, cond in WEATHER_CODE_TO_CONDITION.items():
+            lines.append(f"  {code}: {cond} ({WEATHER_CODE_TO_RAIN.get(code, 0)}mm)")
+        
+        self.info_text.insert(tk.END, "\n".join(lines))
 
 if __name__ == "__main__":
     root = tk.Tk()
-    
-    # Configure style
-    style = ttk.Style()
-    style.theme_use('clam')
-    style.configure('TLabel', font=('Segoe UI', 10))
-    style.configure('TButton', font=('Segoe UI', 10, 'bold'))
-    
     app = WeatherModelGUI(root)
     root.mainloop()
