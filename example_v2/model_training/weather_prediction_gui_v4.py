@@ -21,6 +21,13 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 
+# Matplotlib imports for graphing
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+
 # Try importing tkcalendar
 try:
     from tkcalendar import DateEntry
@@ -114,7 +121,7 @@ class WeatherPredictionGUI_v4:
 
     # --- Logic: Model Loading & Normalization ---
     def browse_model(self):
-        f = filedialog.askopenfilename(filetypes=[("Pickle Files", "*.pkl"), ("All Files", "*.*")])
+        f = filedialog.askopenfilename(filetypes=[("Model Files", "*.pkl;*.joblib"), ("Pickle Files", "*.pkl"), ("Joblib Files", "*.joblib"), ("All Files", "*.*")])
         if f:
             self.path_var.set(f)
             self.load_model(f)
@@ -251,9 +258,14 @@ class WeatherPredictionGUI_v4:
         ttk.Button(type_row, text="GENERATE", command=self.run_range_predict).pack(side='left', padx=20)
         ttk.Button(type_row, text="Export CSV", command=self.export_csv).pack(side='left', padx=5)
         
-        # Results
-        self.range_result = scrolledtext.ScrolledText(self.range_frame, height=20, font=('Consolas', 10))
-        self.range_result.pack(fill='both', expand=True, padx=10, pady=5)
+        # Results - Table
+        self.range_result = scrolledtext.ScrolledText(self.range_frame, height=12, font=('Consolas', 9))
+        self.range_result.pack(fill='x', padx=10, pady=5)
+        
+        # Results - Graph Canvas
+        self.range_graph_frame = ttk.Frame(self.range_frame)
+        self.range_graph_frame.pack(fill='both', expand=True, padx=10, pady=5)
+        self.range_canvas = None  # Will hold FigureCanvasTkAgg
 
     def quick_select(self, hours):
         dt_from = self.get_dt(self.from_date, self.from_hour)
@@ -345,6 +357,9 @@ class WeatherPredictionGUI_v4:
             
         self.range_result.delete("1.0", tk.END)
         self.range_result.insert(tk.END, "\n".join(lines))
+        
+        # Generate Graph
+        self._plot_hourly_graph(timestamps, y_reg, conds)
 
     def predict_daily_range(self, start, end):
         days = (end.date() - start.date()).days + 1
@@ -394,6 +409,113 @@ class WeatherPredictionGUI_v4:
             
         self.range_result.delete("1.0", tk.END)
         self.range_result.insert(tk.END, "\n".join(lines))
+        
+        # Generate Graph
+        self._plot_daily_graph(dates, y_reg, conds)
+
+
+    def _plot_hourly_graph(self, timestamps, y_reg, conds):
+        """Generate multi-subplot graph for hourly forecast"""
+        # Clear previous canvas
+        if self.range_canvas:
+            self.range_canvas.get_tk_widget().destroy()
+        
+        # Create figure with subplots
+        fig = Figure(figsize=(12, 8), dpi=80)
+        
+        # Temperature
+        ax1 = fig.add_subplot(4, 1, 1)
+        ax1.plot([t for t in timestamps], [r[0] for r in y_reg], 'r-', linewidth=2, label='Temperature')
+        ax1.set_ylabel('Temp (°C)')
+        ax1.grid(True, alpha=0.3)
+        ax1.legend()
+        ax1.set_title('Hourly Weather Forecast', fontweight='bold')
+        
+        # Humidity
+        ax2 = fig.add_subplot(4, 1, 2)
+        ax2.plot([t for t in timestamps], [r[1] for r in y_reg], 'b-', linewidth=2, label='Humidity')
+        ax2.set_ylabel('Humidity (%)')
+        ax2.grid(True, alpha=0.3)
+        ax2.legend()
+        
+        # Wind Speed
+        ax3 = fig.add_subplot(4, 1, 3)
+        ax3.plot([t for t in timestamps], [r[2] for r in y_reg], 'g-', linewidth=2, label='Wind Speed')
+        ax3.set_ylabel('Wind (m/s)')
+        ax3.grid(True, alpha=0.3)
+        ax3.legend()
+        
+        # Pressure
+        ax4 = fig.add_subplot(4, 1, 4)
+        ax4.plot([t for t in timestamps], [r[3] for r in y_reg], 'm-', linewidth=2, label='Pressure')
+        ax4.set_ylabel('Pressure (hPa)')
+        ax4.set_xlabel('Time')
+        ax4.grid(True, alpha=0.3)
+        ax4.legend()
+        
+        # Format x-axis
+        for ax in [ax1, ax2, ax3, ax4]:
+            ax.tick_params(axis='x', rotation=45)
+        
+        fig.tight_layout()
+        
+        # Embed in tkinter
+        self.range_canvas = FigureCanvasTkAgg(fig, self.range_graph_frame)
+        self.range_canvas.draw()
+        self.range_canvas.get_tk_widget().pack(fill='both', expand=True)
+
+    def _plot_daily_graph(self, dates, y_reg, conds):
+        """Generate multi-subplot graph for daily forecast"""
+        # Clear previous canvas
+        if self.range_canvas:
+            self.range_canvas.get_tk_widget().destroy()
+        
+        # Create figure with subplots
+        fig = Figure(figsize=(12, 8), dpi=80)
+        
+        # Temperature Range (Min/Max/Mean)
+        ax1 = fig.add_subplot(4, 1, 1)
+        ax1.plot(dates, [r[0] for r in y_reg], 'b-', linewidth=2, label='Min Temp', marker='o')
+        ax1.plot(dates, [r[1] for r in y_reg], 'r-', linewidth=2, label='Max Temp', marker='o')
+        ax1.plot(dates, [r[2] for r in y_reg], 'orange', linewidth=2, label='Mean Temp', marker='o')
+        ax1.fill_between(dates, [r[0] for r in y_reg], [r[1] for r in y_reg], alpha=0.2)
+        ax1.set_ylabel('Temp (°C)')
+        ax1.grid(True, alpha=0.3)
+        ax1.legend()
+        ax1.set_title('Daily Weather Forecast', fontweight='bold')
+        
+        # Humidity Average
+        ax2 = fig.add_subplot(4, 1, 2)
+        ax2.plot(dates, [r[3] for r in y_reg], 'b-', linewidth=2, label='Humidity Avg', marker='s')
+        ax2.set_ylabel('Humidity (%)')
+        ax2.grid(True, alpha=0.3)
+        ax2.legend()
+        
+        # Wind Speed Average
+        ax3 = fig.add_subplot(4, 1, 3)
+        ax3.plot(dates, [r[4] for r in y_reg], 'g-', linewidth=2, label='Wind Speed Avg', marker='^')
+        ax3.set_ylabel('Wind (m/s)')
+        ax3.grid(True, alpha=0.3)
+        ax3.legend()
+        
+        # Pressure Average
+        ax4 = fig.add_subplot(4, 1, 4)
+        ax4.plot(dates, [r[5] for r in y_reg], 'm-', linewidth=2, label='Pressure Avg', marker='d')
+        ax4.set_ylabel('Pressure (hPa)')
+        ax4.set_xlabel('Date')
+        ax4.grid(True, alpha=0.3)
+        ax4.legend()
+        
+        # Format x-axis
+        for ax in [ax1, ax2, ax3, ax4]:
+            ax.tick_params(axis='x', rotation=45)
+        
+        fig.tight_layout()
+        
+        # Embed in tkinter
+        self.range_canvas = FigureCanvasTkAgg(fig, self.range_graph_frame)
+        self.range_canvas.draw()
+        self.range_canvas.get_tk_widget().pack(fill='both', expand=True)
 
     def export_csv(self):
         if not self.predictions_cache: return
@@ -424,7 +546,11 @@ class WeatherPredictionGUI_v4:
         ttk.Button(f, text="PREDICT", command=self.run_single_hourly).grid(row=1, column=0, columnspan=4, pady=10)
         
         self.sh_result = ttk.Label(self.hourly_frame, text="...", font=('Segoe UI', 12))
-        self.sh_result.pack()
+        self.sh_result.pack(pady=5)
+        
+        self.sh_graph_frame = ttk.Frame(self.hourly_frame)
+        self.sh_graph_frame.pack(fill='both', expand=True, padx=10, pady=5)
+        self.sh_canvas = None
 
     def run_single_hourly(self):
         dt = self.get_dt(self.sh_date, self.sh_hour)
@@ -442,6 +568,28 @@ class WeatherPredictionGUI_v4:
         
         res = f"Time: {dt}\nTemp: {reg[0]:.1f} C\nHumid: {reg[1]:.1f} %\nWind: {reg[2]:.1f}\nCond: {cond}"
         self.sh_result.config(text=res)
+        
+        # Plot Single Hourly
+        if self.sh_canvas: self.sh_canvas.get_tk_widget().destroy()
+        
+        fig = Figure(figsize=(6, 4), dpi=80)
+        ax = fig.add_subplot(111)
+        
+        metrics = ['Temp (C)', 'Humid (%)', 'Wind (m/s)', 'Press (hPa/10)']
+        # Scale pressure to fit graph better
+        values = [reg[0], reg[1], reg[2], reg[3]/10.0]
+        colors = ['red', 'blue', 'green', 'purple']
+        
+        ax.bar(metrics, values, color=colors, alpha=0.7)
+        for i, v in enumerate(values):
+            ax.text(i, v + 0.5, f"{v:.1f}", ha='center', fontweight='bold')
+            
+        ax.set_title(f"Forecast for {dt.strftime('%H:%M')} - {cond}")
+        ax.grid(True, axis='y', alpha=0.3)
+        
+        self.sh_canvas = FigureCanvasTkAgg(fig, self.sh_graph_frame)
+        self.sh_canvas.draw()
+        self.sh_canvas.get_tk_widget().pack(fill='both', expand=True)
 
     # --- Tab 3: Single Daily ---
     def create_daily_tab(self):
@@ -459,7 +607,11 @@ class WeatherPredictionGUI_v4:
         ttk.Button(f, text="PREDICT", command=self.run_single_daily).grid(row=1, column=0, columnspan=2, pady=10)
         
         self.sd_result = ttk.Label(self.daily_frame, text="...", font=('Segoe UI', 12))
-        self.sd_result.pack()
+        self.sd_result.pack(pady=5)
+        
+        self.sd_graph_frame = ttk.Frame(self.daily_frame)
+        self.sd_graph_frame.pack(fill='both', expand=True, padx=10, pady=5)
+        self.sd_canvas = None
 
     def run_single_daily(self):
         if TKCALENDAR_AVAILABLE:
@@ -480,6 +632,38 @@ class WeatherPredictionGUI_v4:
         
         res = f"Date: {d}\nMin/Max: {reg[0]:.1f} / {reg[1]:.1f} C\nCond: {cond}"
         self.sd_result.config(text=res)
+        
+        # Plot Single Daily
+        if self.sd_canvas: self.sd_canvas.get_tk_widget().destroy()
+        
+        fig = Figure(figsize=(6, 4), dpi=80)
+        
+        # Temp Range
+        ax1 = fig.add_subplot(1, 2, 1)
+        labels = ['Min', 'Mean', 'Max']
+        temps = [reg[0], reg[2], reg[1]]
+        ax1.bar(labels, temps, color=['blue', 'orange', 'red'], alpha=0.7)
+        for i, v in enumerate(temps):
+            ax1.text(i, v + 0.1, f"{v:.1f}", ha='center', fontweight='bold')
+        ax1.set_title("Temperature (°C)")
+        ax1.grid(True, axis='y', alpha=0.3)
+        
+        # Other Averages
+        ax2 = fig.add_subplot(1, 2, 2)
+        labels2 = ['Humid (%)', 'Wind (m/s)']
+        values2 = [reg[3], reg[4]]
+        ax2.bar(labels2, values2, color=['cyan', 'green'], alpha=0.7)
+        for i, v in enumerate(values2):
+            ax2.text(i, v + 0.1, f"{v:.1f}", ha='center', fontweight='bold')
+        ax2.set_title("Averages")
+        ax2.grid(True, axis='y', alpha=0.3)
+        
+        fig.suptitle(f"Forecast for {d} - {cond}", fontweight='bold')
+        fig.tight_layout()
+        
+        self.sd_canvas = FigureCanvasTkAgg(fig, self.sd_graph_frame)
+        self.sd_canvas.draw()
+        self.sd_canvas.get_tk_widget().pack(fill='both', expand=True)
 
     # --- Tab 4: Info ---
     def create_info_tab(self):
@@ -491,23 +675,113 @@ class WeatherPredictionGUI_v4:
         if not self.model: return
         
         lines = []
-        lines.append("=== Model v4 Info ===")
-        lines.append(f"Version: {self.model['meta'].get('version')}")
-        lines.append(f"Date:    {self.model['meta'].get('date')}")
+        lines.append("=" * 80)
+        lines.append("MODEL v4 INFORMATION")
+        lines.append("=" * 80)
+        lines.append(f"Version:       {self.model['meta'].get('version', 'N/A')}")
+        lines.append(f"Trained Date:  {self.model['meta'].get('date', 'N/A')}")
+        lines.append(f"Model File:    {os.path.basename(self.model_path)}")
         lines.append("")
         
-        lines.append("[Hourly Component]")
-        lines.append(f"Regressor:  {self.model['hourly']['regressor']}")
-        lines.append(f"Classifier: {self.model['hourly']['classifier']}")
-        lines.append(f"Features:   {self.hourly_features}")
-        lines.append(f"Targets:    {self.hourly_targets_reg}")
-        lines.append("")
+        # Hourly Component Details
+        lines.append("=" * 80)
+        lines.append("HOURLY COMPONENT")
+        lines.append("=" * 80)
         
-        lines.append("[Daily Component]")
-        lines.append(f"Regressor:  {self.model['daily']['regressor']}")
-        lines.append(f"Classifier: {self.model['daily']['classifier']}")
-        lines.append(f"Features:   {self.daily_features}")
-        lines.append(f"Targets:    {self.daily_targets_reg}")
+        h_reg = self.model['hourly']['regressor']
+        h_clf = self.model['hourly']['classifier']
+        
+        if h_reg:
+            lines.append(f"\nRegressor Type: {type(h_reg).__name__}")
+            lines.append(f"  Features:     {self.hourly_features}")
+            lines.append(f"  Targets:      {self.hourly_targets_reg}")
+            if hasattr(h_reg, 'n_features_in_'):
+                lines.append(f"  N Features:   {h_reg.n_features_in_}")
+            # Extract key params
+            if hasattr(h_reg, 'get_params'):
+                params = h_reg.get_params()
+                key_params = ['n_estimators', 'max_depth', 'min_samples_split', 'random_state']
+                params_str = ", ".join([f"{k}={params.get(k)}" for k in key_params if k in params])
+                if params_str:
+                    lines.append(f"  Parameters:   {params_str}")
+        else:
+            lines.append("\nRegressor: Not Available")
+        
+        if h_clf:
+            lines.append(f"\nClassifier Type: {type(h_clf).__name__}")
+            if hasattr(h_clf, 'n_features_in_'):
+                lines.append(f"  N Features:   {h_clf.n_features_in_}")
+            if hasattr(h_clf, 'classes_'):
+                lines.append(f"  N Classes:    {len(h_clf.classes_)}")
+            if hasattr(h_clf, 'get_params'):
+                params = h_clf.get_params()
+                key_params = ['n_estimators', 'max_depth', 'class_weight', 'random_state']
+                params_str = ", ".join([f"{k}={params.get(k)}" for k in key_params if k in params])
+                if params_str:
+                    lines.append(f"  Parameters:   {params_str}")
+        else:
+            lines.append("\nClassifier: Not Available")
+        
+        # Label Encoder for Hourly
+        h_le = self.model['encoders'].get('hourly')
+        if h_le and hasattr(h_le, 'classes_'):
+            lines.append(f"\nWeather Conditions (Hourly): {len(h_le.classes_)} classes")
+            lines.append(f"  Classes: {', '.join(map(str, h_le.classes_))}")
+        
+        # Daily Component Details
+        lines.append("\n" + "=" * 80)
+        lines.append("DAILY COMPONENT")
+        lines.append("=" * 80)
+        
+        d_reg = self.model['daily']['regressor']
+        d_clf = self.model['daily']['classifier']
+        
+        if d_reg:
+            lines.append(f"\nRegressor Type: {type(d_reg).__name__}")
+            lines.append(f"  Features:     {self.daily_features}")
+            lines.append(f"  Targets:      {self.daily_targets_reg}")
+            if hasattr(d_reg, 'n_features_in_'):
+                lines.append(f"  N Features:   {d_reg.n_features_in_}")
+            if hasattr(d_reg, 'get_params'):
+                params = d_reg.get_params()
+                key_params = ['n_estimators', 'max_depth', 'min_samples_split', 'random_state']
+                params_str = ", ".join([f"{k}={params.get(k)}" for k in key_params if k in params])
+                if params_str:
+                    lines.append(f"  Parameters:   {params_str}")
+        else:
+            lines.append("\nRegressor: Not Available")
+        
+        if d_clf:
+            lines.append(f"\nClassifier Type: {type(d_clf).__name__}")
+            if hasattr(d_clf, 'n_features_in_'):
+                lines.append(f"  N Features:   {d_clf.n_features_in_}")
+            if hasattr(d_clf, 'classes_'):
+                lines.append(f"  N Classes:    {len(d_clf.classes_)}")
+            if hasattr(d_clf, 'get_params'):
+                params = d_clf.get_params()
+                key_params = ['n_estimators', 'max_depth', 'class_weight', 'random_state']
+                params_str = ", ".join([f"{k}={params.get(k)}" for k in key_params if k in params])
+                if params_str:
+                    lines.append(f"  Parameters:   {params_str}")
+        else:
+            lines.append("\nClassifier: Not Available")
+        
+        # Label Encoder for Daily
+        d_le = self.model['encoders'].get('daily')
+        if d_le and hasattr(d_le, 'classes_'):
+            lines.append(f"\nWeather Conditions (Daily): {len(d_le.classes_)} classes")
+            lines.append(f"  Classes: {', '.join(map(str, d_le.classes_))}")
+        
+        # Weather Code Reference
+        lines.append("\n" + "=" * 80)
+        lines.append("WEATHER CODE REFERENCE")
+        lines.append("=" * 80)
+        lines.append(f"\n{'Code':<6} | {'Condition':<20} | {'Rain (mm/h)':>12}")
+        lines.append("-" * 45)
+        for code in sorted(WEATHER_CODE_TO_CONDITION.keys()):
+            cond = WEATHER_CODE_TO_CONDITION[code]
+            rain = WEATHER_CODE_TO_RAIN.get(code, 0.0)
+            lines.append(f"{code:<6} | {cond:<20} | {rain:>12.1f}")
         
         self.txt_info.insert(tk.END, "\n".join(lines))
 
