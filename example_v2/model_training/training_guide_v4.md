@@ -23,33 +23,33 @@ Dataset berisi data cuaca per-jam dari tahun 2000-2024 dengan struktur **23 kolo
 
 ### Kolom Hourly (Per-Jam)
 
-| Kolom                                  | Tipe     | Deskripsi                              |
-| -------------------------------------- | -------- | -------------------------------------- |
+| Kolom                                | Tipe     | Deskripsi                              |
+| ------------------------------------ | -------- | -------------------------------------- |
 | `id`                                 | int      | ID unik                                |
 | `timestamp`                          | datetime | Waktu pengukuran (per-jam)             |
-| `hour`, `day`, `month`, `year` | int      | Komponen waktu                         |
-| `temp`                               | float    | Suhu (°C)                             |
+| `hour`, `day`, `month`, `year`       | int      | Komponen waktu                         |
+| `temp`                               | float    | Suhu (°C)                              |
 | `humidity`                           | int      | Kelembaban (%)                         |
 | `windspeed`                          | float    | Kecepatan angin (km/h)                 |
 | `sealevelpressure`                   | float    | Tekanan permukaan laut (hPa)           |
 | `rain`                               | float    | Curah hujan (mm)                       |
 | `precipitation`                      | float    | Presipitasi (mm) - identik dengan rain |
-| `apparent_temperature`               | float    | Suhu yang dirasakan (°C)              |
+| `apparent_temperature`               | float    | Suhu yang dirasakan (°C)               |
 | `surface_pressure`                   | float    | Tekanan permukaan (hPa)                |
-| `conditions`                         | int      | Kode cuaca (0-65)                      |
+| `weather_code`                       | int      | Kode cuaca (0-65)                      |
 | `conditions`                         | string   | Kondisi cuaca (teks)                   |
 
 ### Kolom Daily (Per-Hari)
 
-| Kolom                   | Tipe  | Deskripsi                               |
-| ----------------------- | ----- | --------------------------------------- |
-| `temp_max_daily`      | float | Suhu maksimum harian (°C)              |
-| `temp_min_daily`      | float | Suhu minimum harian (°C)               |
-| `conditions_daily`    | int   | Kode cuaca dominan harian               |
-| `temp_mean_daily`     | float | Suhu rata-rata harian (°C)             |
-| `humidity_avg_daily`  | int   | Kelembaban rata-rata harian (%)         |
-| `pressure_avg_daily`  | float | Tekanan rata-rata harian (hPa)          |
-| `windspeed_avg_daily` | float | Kecepatan angin rata-rata harian (km/h) |
+| Kolom                  | Tipe  | Deskripsi                               |
+| ---------------------- | ----- | --------------------------------------- |
+| `temp_max_daily`       | float | Suhu maksimum harian (°C)               |
+| `temp_min_daily`       | float | Suhu minimum harian (°C)                |
+| `conditions_daily`     | int   | Kode cuaca dominan harian               |
+| `temp_mean_daily`      | float | Suhu rata-rata harian (°C)              |
+| `humidity_mean_daily`  | int   | Kelembaban rata-rata harian (%)         |
+| `pressure_mean_daily`  | float | Tekanan rata-rata harian (hPa)          |
+| `windspeed_mean_daily` | float | Kecepatan angin rata-rata harian (km/h) |
 
 > **Catatan:** Kolom daily (`*_daily`) memiliki nilai yang sama untuk semua baris dalam satu hari yang sama.
 
