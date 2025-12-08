@@ -12,6 +12,17 @@
 #include <LoRa.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include "time.h"
+
+// ===== DATA BUFFERING & NTP =====
+float lastTemp = 0, lastHum = 0, lastPress = 0, lastWind = 0;
+int lastRain = 0, lastLight = 0;
+bool newDataAvailable = false;
+bool sentThisSlot = false;
+
+const char* ntpServer = "pool.ntp.org";
+const long  gmtOffset_sec = 7 * 3600; // UTC+7 (WIB)
+const int   daylightOffset_sec = 0;
 
 // ===== PIN CONFIGURATION ESP32-S3 =====
 #define LORA_SCK   12
@@ -97,6 +108,22 @@ void loop() {
   if (packetSize) {
     handleLoRaPacket(packetSize);
   }
+
+  // Scheduled Transmission (Real-Time)
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo)) {
+    // Check if seconds are 0, 10, 20, 30, 40, 50
+    if (timeinfo.tm_sec % 10 == 0) {
+      if (!sentThisSlot && newDataAvailable) {
+        Serial.printf("\n[TIMING] %02d:%02d:%02d - Sending buffered data...\n", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        sendToBackend(lastTemp, lastHum, lastPress, lastWind, lastRain, lastLight);
+        sentThisSlot = true;
+        newDataAvailable = false;
+      }
+    } else {
+      sentThisSlot = false; // Reset flag when we move past the target second
+    }
+  }
   
   delay(10);
 }
@@ -123,7 +150,12 @@ void setupWiFi() {
     Serial.println("\n✓ WiFi connected!");
     Serial.print("  IP address: ");
     Serial.println(WiFi.localIP());
+    Serial.println(WiFi.localIP());
     digitalWrite(LED_BUILTIN, HIGH);
+    
+    // Init NTP
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+    Serial.println("✓ NTP Initialized (UTC+7)");
   } else {
     Serial.println("\n✗ WiFi connection failed!");
     digitalWrite(LED_BUILTIN, LOW);
@@ -216,8 +248,16 @@ void handleLoRaPacket(int packetSize) {
       Serial.println("Light Level : " + String(light));
       Serial.println("----------------------------");
       
-      // Kirim ke backend
-      sendToBackend(temp, hum, press, wind, rain, light);
+      // Update Buffer instead of sending immediately
+      lastTemp = temp;
+      lastHum = hum;
+      lastPress = press;
+      lastWind = wind;
+      lastRain = rain;
+      lastLight = light;
+      newDataAvailable = true;
+      
+      Serial.println("✓ Data Buffered. Waiting for next transmission slot (:00, :10, ...)");
     } else {
       Serial.println("✗ Invalid data format: Not enough fields");
     }
