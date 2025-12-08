@@ -50,7 +50,8 @@ const unsigned long ANEMOMETER_READ_INTERVAL = 1000; // Baca setiap 1 detik
 
 // ===== TRANSMISSION SETTINGS =====
 // const unsigned long TRANSMIT_INTERVAL = 10000; // Kirim data setiap 10 detik
-const unsigned long TRANSMIT_INTERVAL = 1000; // Kirim data setiap 1 detik
+// const unsigned long TRANSMIT_INTERVAL = 10000; // Kirim data setiap 10 detik
+const unsigned long TRANSMIT_INTERVAL = 10000; // Kirim data setiap 10 detik (Increased for SF12 airtime)
 unsigned long lastTransmit = 0;
 
 // ===== DEVICE ID =====
@@ -79,11 +80,11 @@ void setup() {
     Serial.println("LoRa init failed!");
     while (1);
   }
-  
-  // Konfigurasi LoRa
-  LoRa.setSpreadingFactor(7);
+
+  // Konfigurasi LoRa (Long Range Mode)
+  LoRa.setSpreadingFactor(12); // Max Range (was 7)
   LoRa.setSignalBandwidth(125E3);
-  LoRa.setCodingRate4(5);
+  LoRa.setCodingRate4(8);      // Max Error Correction (was 5)
   LoRa.setSyncWord(0x12);
   LoRa.setTxPower(20);
   

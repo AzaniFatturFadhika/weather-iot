@@ -22,14 +22,17 @@
 #define LORA_DIO0  8
 
 // ===== WIFI CONFIGURATION =====
-const char* WIFI_SSID = "SUMUR BOTO 1";
-const char* WIFI_PASSWORD = "semarang123";
+// const char* WIFI_SSID = "SUMUR BOTO 1";
+// const char* WIFI_PASSWORD = "semarang123";
+const char* WIFI_SSID = "POCO X6 5G";
+const char* WIFI_PASSWORD = "estehangetpoll";
 
 // ===== BACKEND CONFIGURATION =====
 // Ganti dengan IP address komputer yang menjalankan backend (jika local)
 // atau domain server jika sudah di-hosting.
 // Contoh: "http://192.168.1.100:8000"
-const char* BACKEND_URL = "http://192.168.1.100:8000";
+// const char* BACKEND_URL = "http://192.168.1.100:8000";
+const char* BACKEND_URL = "http://10.252.206.210:8000";
 
 // ===== LED INDICATOR =====
 #define LED_BUILTIN 48
@@ -57,6 +60,7 @@ void setup() {
   // Setup LoRa
   SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_SS);
   LoRa.setPins(LORA_SS, LORA_RST, LORA_DIO0);
+  LoRa.setSPIFrequency(1E6); // Reduce SPI frequency to 1MHz to fix garbage data
   
   if (!LoRa.begin(433E6)) {
     Serial.println("✗ LoRa init failed!");
@@ -66,11 +70,12 @@ void setup() {
     }
   }
   
-  // Konfigurasi LoRa (sama dengan Transmitter)
-  LoRa.setSpreadingFactor(7);
+  // Konfigurasi LoRa (Long Range Mode - Match Transmitter)
+  LoRa.setSpreadingFactor(12); // Max Range
   LoRa.setSignalBandwidth(125E3);
-  LoRa.setCodingRate4(5);
+  LoRa.setCodingRate4(8);      // Max Error Correction
   LoRa.setSyncWord(0x12);
+  LoRa.setTxPower(20);
   
   Serial.println("✓ LoRa initialized!");
   
@@ -137,34 +142,62 @@ void handleLoRaPacket(int packetSize) {
   float snr = LoRa.packetSnr();
   
   Serial.println("\n===== LoRa Packet Received =====");
-  Serial.println("Data: " + received);
+  Serial.println("Raw Data: " + received);
   Serial.print("RSSI: "); Serial.print(rssi); Serial.println(" dBm");
+  Serial.print("SNR: "); Serial.print(snr); Serial.println(" dB");
   
   if (received.length() > 0) {
-    // Parse data
-    // Format: DEVICE_ID|temp|hum|press|wind|rain|light|CRC
-    
-    // Blink LED External saat menerima data
     // Nyalakan LED (Start Processing)
     digitalWrite(LORA_LED, HIGH);
     
-    // delay(100);  // REMOVED: Blocking delay removed for 1s interval optimization
-    // digitalWrite(LORA_LED, LOW); // Moved to end of function
+    // 1. Validate CRC
+    // Format: DEVICE_ID|temp|hum|press|wind|rain|light|CRC
+    int lastPipeIndex = received.lastIndexOf('|');
     
+    if (lastPipeIndex == -1) {
+       Serial.println("✗ Invalid format: No CRC separator found");
+       digitalWrite(LORA_LED, LOW);
+       return;
+    }
+
+    String dataPayload = received.substring(0, lastPipeIndex);
+    String receivedCrcHex = received.substring(lastPipeIndex + 1);
+    
+    // Calculate CRC (XOR Checksum)
+    uint8_t calculatedCrc = 0;
+    for (int i = 0; i < dataPayload.length(); i++) {
+      calculatedCrc ^= dataPayload[i];
+    }
+    
+    // Convert received Hex string to byte
+    uint8_t receivedCrc = (uint8_t) strtol(receivedCrcHex.c_str(), NULL, 16);
+    
+    if (calculatedCrc != receivedCrc) {
+      Serial.print("✗ CRC Mismatch! Calc: 0x"); Serial.print(calculatedCrc, HEX);
+      Serial.print(", Recv: 0x"); Serial.println(receivedCrc, HEX);
+      digitalWrite(LORA_LED, LOW);
+      return;
+    }
+    
+    Serial.println("✓ CRC Valid!");
+    
+    // 2. Parse Data
+    // Format: DEVICE_ID|temp|hum|press|wind|rain|light
     int fieldCount = 0;
     int lastIndex = 0;
-    String fields[8];
+    String fields[7]; // ID, temp, hum, press, wind, rain, light
     
-    for (int i = 0; i <= received.length(); i++) {
-      if (received.charAt(i) == '|' || i == received.length()) {
-        fields[fieldCount] = received.substring(lastIndex, i);
+    for (int i = 0; i <= dataPayload.length(); i++) {
+      if (dataPayload.charAt(i) == '|' || i == dataPayload.length()) {
+        fields[fieldCount] = dataPayload.substring(lastIndex, i);
         lastIndex = i + 1;
         fieldCount++;
-        if (fieldCount >= 8) break;
+        if (fieldCount >= 7) break;
       }
     }
     
-    if (fieldCount >= 7) { // Minimal 7 field tanpa CRC check ketat untuk demo
+    if (fieldCount >= 7) {
+      String deviceId = fields[0];
       float temp = fields[1].toFloat();
       float hum = fields[2].toFloat();
       float press = fields[3].toFloat();
@@ -172,14 +205,25 @@ void handleLoRaPacket(int packetSize) {
       int rain = fields[5].toInt();
       int light = fields[6].toInt();
       
+      // 3. Print Detailed Data
+      Serial.println("\n--- Decoded Weather Data ---");
+      Serial.println("Device ID   : " + deviceId);
+      Serial.println("Temperature : " + String(temp, 2) + " °C");
+      Serial.println("Humidity    : " + String(hum, 2) + " %");
+      Serial.println("Pressure    : " + String(press, 2) + " hPa");
+      Serial.println("Wind Speed  : " + String(wind, 2) + " km/h");
+      Serial.println("Rain Status : " + String(rain == 1 ? "Wet (Raining)" : "Dry"));
+      Serial.println("Light Level : " + String(light));
+      Serial.println("----------------------------");
+      
       // Kirim ke backend
       sendToBackend(temp, hum, press, wind, rain, light);
     } else {
-      Serial.println("✗ Invalid data format");
+      Serial.println("✗ Invalid data format: Not enough fields");
     }
   }
   
-  // Matikan LED setelah selesai proses (termasuk kirim HTTP)
+  // Matikan LED setelah selesai proses
   digitalWrite(LORA_LED, LOW);
 }
 
