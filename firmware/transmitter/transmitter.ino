@@ -49,7 +49,8 @@ const unsigned long ANEMOMETER_READ_INTERVAL = 1000; // Baca setiap 1 detik
 #define ONE_ROTATION_SENSOR 18.0       // pulse per rotation
 
 // ===== TRANSMISSION SETTINGS =====
-const unsigned long TRANSMIT_INTERVAL = 10000; // Kirim data setiap 10 detik
+// const unsigned long TRANSMIT_INTERVAL = 10000; // Kirim data setiap 10 detik
+const unsigned long TRANSMIT_INTERVAL = 1000; // Kirim data setiap 1 detik
 unsigned long lastTransmit = 0;
 
 // ===== DEVICE ID =====

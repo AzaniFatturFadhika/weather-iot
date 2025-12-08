@@ -29,10 +29,12 @@ const char* WIFI_PASSWORD = "semarang123";
 // Ganti dengan IP address komputer yang menjalankan backend (jika local)
 // atau domain server jika sudah di-hosting.
 // Contoh: "http://192.168.1.100:8000"
-const char* BACKEND_URL = "http://192.168.1.100:8000"; 
+const char* BACKEND_URL = "http://192.168.1.100:8000";
 
 // ===== LED INDICATOR =====
 #define LED_BUILTIN 48
+#define LORA_LED 4  // Indikator LED untuk data LoRa masuk
+
 
 void setupWiFi();
 void handleLoRaPacket(int packetSize);
@@ -47,6 +49,10 @@ void setup() {
   // Setup LED
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
+
+  pinMode(LORA_LED, OUTPUT);
+  digitalWrite(LORA_LED, LOW);
+
   
   // Setup LoRa
   SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_SS);
@@ -138,6 +144,13 @@ void handleLoRaPacket(int packetSize) {
     // Parse data
     // Format: DEVICE_ID|temp|hum|press|wind|rain|light|CRC
     
+    // Blink LED External saat menerima data
+    // Nyalakan LED (Start Processing)
+    digitalWrite(LORA_LED, HIGH);
+    
+    // delay(100);  // REMOVED: Blocking delay removed for 1s interval optimization
+    // digitalWrite(LORA_LED, LOW); // Moved to end of function
+    
     int fieldCount = 0;
     int lastIndex = 0;
     String fields[8];
@@ -166,10 +179,8 @@ void handleLoRaPacket(int packetSize) {
     }
   }
   
-  // Blink LED
-  digitalWrite(LED_BUILTIN, LOW);
-  delay(50);
-  digitalWrite(LED_BUILTIN, HIGH);
+  // Matikan LED setelah selesai proses (termasuk kirim HTTP)
+  digitalWrite(LORA_LED, LOW);
 }
 
 void sendToBackend(float temp, float hum, float press, float wind, int rain, int light) {
