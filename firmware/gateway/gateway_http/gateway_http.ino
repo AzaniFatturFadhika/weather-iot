@@ -18,7 +18,8 @@
 float lastTemp = 0, lastHum = 0, lastPress = 0, lastWind = 0;
 int lastRain = 0, lastLight = 0;
 bool newDataAvailable = false;
-bool sentThisSlot = false;
+unsigned long lastSendAttemptMs = 0;
+const unsigned long SEND_RETRY_INTERVAL_MS = 10000; // selaras dengan interval TX (10s)
 
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 7 * 3600; // UTC+7 (WIB)
@@ -33,10 +34,10 @@ const int   daylightOffset_sec = 0;
 #define LORA_DIO0  9
 
 // ===== WIFI CONFIGURATION =====
-// const char* WIFI_SSID = "SUMUR BOTO 1";
-// const char* WIFI_PASSWORD = "semarang123";
-const char* WIFI_SSID = "POCO X6 5G";
-const char* WIFI_PASSWORD = "estehangetpoll";
+const char* WIFI_SSID = "SUMUR BOTO 1";
+const char* WIFI_PASSWORD = "semarang123";
+// const char* WIFI_SSID = "POCO X6 5G";
+// const char* WIFI_PASSWORD = "estehangetpoll";
 
 // ===== BACKEND CONFIGURATION =====
 // Ganti dengan IP address komputer yang menjalankan backend (jika local)
@@ -52,7 +53,7 @@ const char* BACKEND_URL = "https://api.azanifattur.biz.id";
 
 void setupWiFi();
 void handleLoRaPacket(int packetSize);
-void sendToBackend(float temp, float hum, float press, float wind, int rain, int light);
+bool sendToBackend(float temp, float hum, float press, float wind, int rain, int light);
 
 void setup() {
   Serial.begin(115200);
@@ -109,19 +110,14 @@ void loop() {
     handleLoRaPacket(packetSize);
   }
 
-  // Scheduled Transmission (Real-Time)
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo)) {
-    // Check if seconds are 0, 10, 20, 30, 40, 50
-    if (timeinfo.tm_sec % 10 == 0) {
-      if (!sentThisSlot && newDataAvailable) {
-        Serial.printf("\n[TIMING] %02d:%02d:%02d - Sending buffered data...\n", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-        sendToBackend(lastTemp, lastHum, lastPress, lastWind, lastRain, lastLight);
-        sentThisSlot = true;
-        newDataAvailable = false;
-      }
-    } else {
-      sentThisSlot = false; // Reset flag when we move past the target second
+  // Retry kirim data buffer tiap 10 detik agar selaras dengan interval transmitter
+  unsigned long nowMs = millis();
+  if (newDataAvailable && (nowMs - lastSendAttemptMs >= SEND_RETRY_INTERVAL_MS)) {
+    Serial.println("\n[RETRY] Sending buffered data...");
+    bool sent = sendToBackend(lastTemp, lastHum, lastPress, lastWind, lastRain, lastLight);
+    lastSendAttemptMs = nowMs;
+    if (sent) {
+      newDataAvailable = false;
     }
   }
   
@@ -248,7 +244,7 @@ void handleLoRaPacket(int packetSize) {
       Serial.println("Light Level : " + String(light));
       Serial.println("----------------------------");
       
-      // Update Buffer instead of sending immediately
+      // Simpan data terbaru, coba kirim langsung, buffer jika gagal
       lastTemp = temp;
       lastHum = hum;
       lastPress = press;
@@ -256,8 +252,13 @@ void handleLoRaPacket(int packetSize) {
       lastRain = rain;
       lastLight = light;
       newDataAvailable = true;
-      
-      Serial.println("✓ Data Buffered. Waiting for next transmission slot (:00, :10, ...)");
+      lastSendAttemptMs = millis();
+
+      bool sent = sendToBackend(lastTemp, lastHum, lastPress, lastWind, lastRain, lastLight);
+      if (sent) {
+        newDataAvailable = false;
+      }
+      Serial.println("Data processed from LoRa (buffered for retry if needed)");
     } else {
       Serial.println("✗ Invalid data format: Not enough fields");
     }
@@ -267,41 +268,44 @@ void handleLoRaPacket(int packetSize) {
   digitalWrite(LORA_LED, LOW);
 }
 
-void sendToBackend(float temp, float hum, float press, float wind, int rain, int light) {
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    
-    // Construct URL with query parameters
-    // Endpoint: /weather-data/create?temp=...&humidity=...
-    String url = String(BACKEND_URL) + "/weather-data/create?";
-    url += "temp=" + String(temp, 2);
-    url += "&humidity=" + String(hum, 2);
-    url += "&pressure=" + String(press, 2);
-    url += "&windSpeed=" + String(wind, 2);
-    
-    // Nilai rain sudah berupa 0 (Dry) atau 1 (Wet) dari transmitter
-    int isRaining = rain; 
-    url += "&isRaining=" + String(isRaining);
-    
-    url += "&lightIntensity=" + String(light);
-    
-    Serial.print("Sending HTTP GET: ");
-    Serial.println(url);
-    
-    http.begin(url);
-    int httpResponseCode = http.GET();
-    
-    if (httpResponseCode > 0) {
-      String response = http.getString();
-      Serial.println("HTTP Response code: " + String(httpResponseCode));
-      Serial.println("Response: " + response);
-    } else {
-      Serial.print("Error code: ");
-      Serial.println(httpResponseCode);
-    }
-    
-    http.end();
-  } else {
+bool sendToBackend(float temp, float hum, float press, float wind, int rain, int light) {
+  if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi Disconnected");
+    return false;
+  }
+
+  HTTPClient http;
+  
+  // Construct URL with query parameters
+  // Endpoint: /weather-data/create?temp=...&humidity=...
+  String url = String(BACKEND_URL) + "/weather-data/create?";
+  url += "temp=" + String(temp, 2);
+  url += "&humidity=" + String(hum, 2);
+  url += "&pressure=" + String(press, 2);
+  url += "&windSpeed=" + String(wind, 2);
+  
+  // Nilai rain sudah berupa 0 (Dry) atau 1 (Wet) dari transmitter
+  int isRaining = rain; 
+  url += "&isRaining=" + String(isRaining);
+  
+  url += "&lightIntensity=" + String(light);
+  
+  Serial.print("Sending HTTP GET: ");
+  Serial.println(url);
+  
+  http.begin(url);
+  int httpResponseCode = http.GET();
+  
+  if (httpResponseCode > 0) {
+    String response = http.getString();
+    Serial.println("HTTP Response code: " + String(httpResponseCode));
+    Serial.println("Response: " + response);
+    http.end();
+    return httpResponseCode >= 200 && httpResponseCode < 300;
+  } else {
+    Serial.print("Error code: ");
+    Serial.println(httpResponseCode);
+    http.end();
+    return false;
   }
 }
