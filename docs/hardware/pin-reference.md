@@ -37,8 +37,8 @@
 
 | Pin     | Function    | Component   | Notes                       |
 | ------- | ----------- | ----------- | --------------------------- |
-| GPIO 8  | Interrupt   | LoRa DIO0   | Interrupt-capable, safe pin |
-| GPIO 9  | Digital I/O | LoRa RESET  | Safe GPIO                   |
+| GPIO 8  | Digital I/O | LoRa RESET  | Safe GPIO                   |
+| GPIO 9  | Interrupt   | LoRa DIO0   | Interrupt-capable, safe pin |
 | GPIO 10 | SPI CS      | LoRa NSS/CS | Safe GPIO                   |
 | GPIO 11 | SPI MOSI    | LoRa MOSI   | Safe GPIO                   |
 | GPIO 12 | SPI SCK     | LoRa SCK    | Safe GPIO                   |

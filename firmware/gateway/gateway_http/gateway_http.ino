@@ -29,8 +29,8 @@ const int   daylightOffset_sec = 0;
 #define LORA_MISO  13
 #define LORA_MOSI  11
 #define LORA_SS    10
-#define LORA_RST   9
-#define LORA_DIO0  8
+#define LORA_RST   8
+#define LORA_DIO0  9
 
 // ===== WIFI CONFIGURATION =====
 // const char* WIFI_SSID = "SUMUR BOTO 1";
@@ -43,7 +43,7 @@ const char* WIFI_PASSWORD = "estehangetpoll";
 // atau domain server jika sudah di-hosting.
 // Contoh: "http://192.168.1.100:8000"
 // const char* BACKEND_URL = "http://192.168.1.100:8000";
-const char* BACKEND_URL = "http://10.252.206.210:8000";
+const char* BACKEND_URL = "https://api.azanifattur.biz.id";
 
 // ===== LED INDICATOR =====
 #define LED_BUILTIN 48
