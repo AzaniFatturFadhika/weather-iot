@@ -38,10 +38,15 @@ const char* WIFI_SSID = "KelompokCuaca";
 const char* WIFI_PASSWORD = "esTeHangetSegar";
 
 // ===== BACKEND CONFIGURATION =====
-// Ganti dengan IP address komputer yang menjalankan backend (jika local)
-// atau domain server jika sudah di-hosting.
-// Contoh: "http://192.168.1.100:8000"
-const char* BACKEND_URL = "https://api.azanifattur.biz.id";
+// Mendukung pengiriman ke 2 endpoint sekaligus
+// Endpoint 1: Primary
+const char* BACKEND_URL_1 = "https://api.azanifattur.biz.id";
+// Endpoint 2: Secondary
+const char* BACKEND_URL_2 = "https://api.wrseno.my.id";
+
+// Array untuk iterasi
+const char* BACKEND_URLS[] = {BACKEND_URL_1, BACKEND_URL_2};
+const int NUM_ENDPOINTS = 2;
 
 // ===== LED INDICATOR =====
 #define LED_BUILTIN 48
@@ -50,7 +55,8 @@ const char* BACKEND_URL = "https://api.azanifattur.biz.id";
 
 void setupWiFi();
 void handleLoRaPacket(int packetSize);
-bool sendToBackend(float temp, float hum, float press, float wind, int rain, int light);
+int sendToAllEndpoints(float temp, float hum, float press, float wind, int rain, int light);
+bool sendToEndpoint(const char* backendUrl, float temp, float hum, float press, float wind, int rain, int light);
 
 void setup() {
   Serial.begin(115200);
@@ -111,7 +117,8 @@ void loop() {
   unsigned long nowMs = millis();
   if (newDataAvailable && (nowMs - lastSendAttemptMs >= SEND_RETRY_INTERVAL_MS)) {
     Serial.println("\n[RETRY] Sending buffered data...");
-    bool sent = sendToBackend(lastTemp, lastHum, lastPress, lastWind, lastRain, lastLight);
+    int sentCount = sendToAllEndpoints(lastTemp, lastHum, lastPress, lastWind, lastRain, lastLight);
+    bool sent = (sentCount > 0);
     lastSendAttemptMs = nowMs;
     if (sent) {
       newDataAvailable = false;
@@ -251,7 +258,8 @@ void handleLoRaPacket(int packetSize) {
       newDataAvailable = true;
       lastSendAttemptMs = millis();
 
-      bool sent = sendToBackend(lastTemp, lastHum, lastPress, lastWind, lastRain, lastLight);
+      int sentCount = sendToAllEndpoints(lastTemp, lastHum, lastPress, lastWind, lastRain, lastLight);
+      bool sent = (sentCount > 0);
       if (sent) {
         newDataAvailable = false;
       }
@@ -265,42 +273,76 @@ void handleLoRaPacket(int packetSize) {
   digitalWrite(LORA_LED, LOW);
 }
 
-bool sendToBackend(float temp, float hum, float press, float wind, int rain, int light) {
+// Kirim data ke SEMUA endpoint, return jumlah yang berhasil
+int sendToAllEndpoints(float temp, float hum, float press, float wind, int rain, int light) {
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi Disconnected");
-    return false;
+    Serial.println("WiFi Disconnected - Cannot send to any endpoint");
+    return 0;
   }
 
+  int successCount = 0;
+  
+  Serial.println("\n--- Sending to Multiple Endpoints ---");
+  
+  for (int i = 0; i < NUM_ENDPOINTS; i++) {
+    Serial.print("[Endpoint ");
+    Serial.print(i + 1);
+    Serial.print("/");
+    Serial.print(NUM_ENDPOINTS);
+    Serial.print("] ");
+    Serial.println(BACKEND_URLS[i]);
+    
+    bool success = sendToEndpoint(BACKEND_URLS[i], temp, hum, press, wind, rain, light);
+    
+    if (success) {
+      successCount++;
+      Serial.println("  ✓ Success");
+    } else {
+      Serial.println("  ✗ Failed");
+    }
+  }
+  
+  Serial.print("--- Total: ");
+  Serial.print(successCount);
+  Serial.print("/");
+  Serial.print(NUM_ENDPOINTS);
+  Serial.println(" endpoints succeeded ---\n");
+  
+  return successCount;
+}
+
+// Kirim data ke satu endpoint
+bool sendToEndpoint(const char* backendUrl, float temp, float hum, float press, float wind, int rain, int light) {
   HTTPClient http;
   
   // Construct URL with query parameters
-  // Endpoint: /weather-data/create?temp=...&humidity=...
-  String url = String(BACKEND_URL) + "/weather-data/create?";
+  String url = String(backendUrl) + "/weather-data/create?";
   url += "temp=" + String(temp, 2);
   url += "&humidity=" + String(hum, 2);
   url += "&pressure=" + String(press, 2);
   url += "&windSpeed=" + String(wind, 2);
   
   // Nilai rain sudah berupa 0 (Dry) atau 1 (Wet) dari transmitter
-  int isRaining = rain; 
-  url += "&isRaining=" + String(isRaining);
-  
+  url += "&isRaining=" + String(rain);
   url += "&lightIntensity=" + String(light);
   
-  Serial.print("Sending HTTP GET: ");
+  Serial.print("  URL: ");
   Serial.println(url);
   
   http.begin(url);
+  http.setTimeout(10000); // 10 second timeout per endpoint
   int httpResponseCode = http.GET();
   
   if (httpResponseCode > 0) {
     String response = http.getString();
-    Serial.println("HTTP Response code: " + String(httpResponseCode));
-    Serial.println("Response: " + response);
+    Serial.print("  Response: ");
+    Serial.print(httpResponseCode);
+    Serial.print(" - ");
+    Serial.println(response.substring(0, 100)); // Limit response output
     http.end();
     return httpResponseCode >= 200 && httpResponseCode < 300;
   } else {
-    Serial.print("Error code: ");
+    Serial.print("  Error: ");
     Serial.println(httpResponseCode);
     http.end();
     return false;

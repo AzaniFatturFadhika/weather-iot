@@ -159,20 +159,45 @@ class WeatherModelGUI:
 
     def _normalize_model(self, raw):
         norm = {
-            'hourly': {'regressor': None, 'classifier': None, 'feature_columns': []},
-            'daily': {'regressor': None, 'classifier': None, 'feature_columns': []},
-            'weather_code_to_rain': WEATHER_CODE_TO_RAIN
+            'hourly': {'regressor': None, 'classifier': None, 'feature_columns': [], 'target_regression': [], 'target_classification': ''},
+            'daily': {'regressor': None, 'classifier': None, 'feature_columns': [], 'target_regression': [], 'target_classification': ''},
+            'weather_code_to_rain': WEATHER_CODE_TO_RAIN,
+            'version': raw.get('version', 'Unknown'),
+            'model_type': raw.get('model_type', 'Unknown'),
+            'trained_date': raw.get('trained_date', 'Unknown')
         }
-        # Combined
+        # Combined model with 'hourly' and 'daily' keys
         if 'hourly' in raw and 'daily' in raw:
-            norm['hourly'] = raw['hourly']
-            norm['daily'] = raw['daily']
+            # Copy hourly data
+            h = raw['hourly']
+            norm['hourly'] = {
+                'regressor': h.get('regressor'),
+                'classifier': h.get('classifier'),
+                'feature_columns': h.get('feature_columns', []),
+                'target_regression': h.get('target_regression', []),
+                'target_classification': h.get('target_classification', '')
+            }
+            # Copy daily data
+            d = raw['daily']
+            norm['daily'] = {
+                'regressor': d.get('regressor'),
+                'classifier': d.get('classifier'),
+                'feature_columns': d.get('feature_columns', []),
+                'target_regression': d.get('target_regression', []),
+                'target_classification': d.get('target_classification', '')
+            }
             norm['weather_code_to_rain'] = raw.get('weather_code_to_rain', WEATHER_CODE_TO_RAIN)
         # Partial (hourly or daily package)
         elif 'regressor' in raw:
             is_daily = 'daily' in raw.get('model_type', '')
             key = 'daily' if is_daily else 'hourly'
-            norm[key] = raw
+            norm[key] = {
+                'regressor': raw.get('regressor'),
+                'classifier': raw.get('classifier'),
+                'feature_columns': raw.get('feature_columns', []),
+                'target_regression': raw.get('target_regression', []),
+                'target_classification': raw.get('target_classification', '')
+            }
         return norm
 
     # --- Tab 1: Range Forecast ---
@@ -250,6 +275,33 @@ class WeatherModelGUI:
             d = datetime.strptime(d_widget.get(), '%Y-%m-%d').date()
         return datetime.combine(d, datetime.min.time()) + timedelta(hours=int(h_widget.get()))
 
+    def build_hourly_input(self, dt, current_conditions, feature_columns):
+        """Build input dictionary based on feature_columns dynamically"""
+        state = {}
+        for feat in feature_columns:
+            if feat == 'year':
+                state[feat] = dt.year
+            elif feat == 'month':
+                state[feat] = dt.month
+            elif feat == 'day':
+                state[feat] = dt.day
+            elif feat == 'hour':
+                state[feat] = dt.hour
+            elif feat == 'temp':
+                state[feat] = current_conditions.get('temp', 28.5)
+            elif feat == 'humidity_avg':
+                state[feat] = current_conditions.get('humidity_avg', 75)
+            elif feat == 'windspeed_avg':
+                state[feat] = current_conditions.get('windspeed_avg', 5.0)
+            elif feat == 'pressure_avg':
+                state[feat] = current_conditions.get('pressure_avg', 1010.5)
+            elif feat in current_conditions:
+                state[feat] = current_conditions[feat]
+            else:
+                # Default to 0 for unknown features
+                state[feat] = self.default_hourly.get(feat, 0)
+        return state
+
     def run_range_predict(self):
         if not self.model:
             return messagebox.showerror("Error", "Load model first")
@@ -272,20 +324,23 @@ class WeatherModelGUI:
             self.predict_daily_recursive(start, end)
 
     def predict_hourly_recursive(self, start, end):
-        """Recursive forecast for hourly using lag features"""
+        """Recursive forecast for hourly - supports both lag and simple features"""
         hours = int((end - start).total_seconds() / 3600)
         
         reg = self.model['hourly']['regressor']
         clf = self.model['hourly']['classifier']
         features = self.hourly_features
+        target_reg = self.model['hourly'].get('target_regression', ['temp', 'humidity_avg', 'windspeed_avg', 'pressure_avg'])
         
-        # Initialize state from defaults
-        state = self.default_hourly.copy()
-        
-        # Storage for rolling calculation (last 24 values)
-        temp_history = [state['temp_lag_1']] * 24
-        humid_history = [state['humidity_lag_1']] * 24
-        wind_history = [state['windspeed_lag_1']] * 24
+        # Initialize current conditions
+        current_conditions = {
+            'temp': 28.5,
+            'humidity_avg': 75,
+            'windspeed_avg': 5.0,
+            'pressure_avg': 1010.5
+        }
+        # Also copy defaults for backward compatibility with lag features
+        current_conditions.update(self.default_hourly)
         
         self.predictions_cache = []
         lines = [f"{'Time':<18} | {'Temp':>6} | {'Humid':>6} | {'Wind':>6} | {'Press':>8} | Condition"]
@@ -293,51 +348,43 @@ class WeatherModelGUI:
         
         current = start
         for i in range(hours):
-            state['hour'] = current.hour
-            state['month'] = current.month
+            # Build input using dynamic feature builder
+            state = self.build_hourly_input(current, current_conditions, features)
             
-            # Build input
+            # Build DataFrame
             X = pd.DataFrame([[state.get(f, 0) for f in features]], columns=features)
             
-            y_reg = reg.predict(X)[0]  # [temp, humid, wind, press]
+            y_reg = reg.predict(X)[0]  # Multi-output: [temp, humid, wind, press]
             y_clf = clf.predict(X)[0]
+            
+            # Handle multi-output or single-output
+            if hasattr(y_reg, '__len__') and len(y_reg) >= 4:
+                temp, humid, wind, press = y_reg[0], y_reg[1], y_reg[2], y_reg[3]
+            else:
+                temp, humid, wind, press = y_reg, 75, 5.0, 1010.5  # Fallback
             
             code = int(y_clf)
             cond = WEATHER_CODE_TO_CONDITION.get(code, str(code))
             
-            lines.append(f"{current.strftime('%Y-%m-%d %H:%M'):<18} | {y_reg[0]:>6.1f} | {y_reg[1]:>6.1f} | {y_reg[2]:>6.1f} | {y_reg[3]:>8.1f} | {cond}")
+            lines.append(f"{current.strftime('%Y-%m-%d %H:%M'):<18} | {temp:>6.1f} | {humid:>6.1f} | {wind:>6.1f} | {press:>8.1f} | {cond}")
             
             self.predictions_cache.append({
                 'Time': current,
-                'Temp': y_reg[0], 'Humidity': y_reg[1],
-                'Wind': y_reg[2], 'Pressure': y_reg[3],
+                'Temp': temp, 'Humidity': humid,
+                'Wind': wind, 'Pressure': press,
                 'Code': code, 'Condition': cond
             })
             
-            # --- Update State (Recursive Step) ---
-            # Shift history
-            temp_history.pop(0)
-            temp_history.append(y_reg[0])
-            humid_history.pop(0)
-            humid_history.append(y_reg[1])
-            wind_history.pop(0)
-            wind_history.append(y_reg[2])
-            
-            # Update lag_1
-            state['temp_lag_1'] = y_reg[0]
-            state['humidity_lag_1'] = y_reg[1]
-            state['windspeed_lag_1'] = y_reg[2]
-            state['sealevelpressure_lag_1'] = y_reg[3]
-            
-            # Update lag_24 (value from 24 hours ago in history)
-            state['temp_lag_24'] = temp_history[0]
-            state['humidity_lag_24'] = humid_history[0]
-            state['windspeed_lag_24'] = wind_history[0]
-            
-            # Update rolling_24 (average of history)
-            state['temp_rolling_24'] = np.mean(temp_history)
-            state['humidity_rolling_24'] = np.mean(humid_history)
-            state['windspeed_rolling_24'] = np.mean(wind_history)
+            # Update current conditions for recursive forecast
+            current_conditions['temp'] = temp
+            current_conditions['humidity_avg'] = humid
+            current_conditions['windspeed_avg'] = wind
+            current_conditions['pressure_avg'] = press
+            # Also update lag-style keys for backward compatibility
+            current_conditions['temp_lag_1'] = temp
+            current_conditions['humidity_lag_1'] = humid
+            current_conditions['windspeed_lag_1'] = wind
+            current_conditions['sealevelpressure_lag_1'] = press
             
             current += timedelta(hours=1)
         
