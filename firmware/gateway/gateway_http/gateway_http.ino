@@ -34,16 +34,13 @@ const int   daylightOffset_sec = 0;
 #define LORA_DIO0  9
 
 // ===== WIFI CONFIGURATION =====
-const char* WIFI_SSID = "SUMUR BOTO 1";
-const char* WIFI_PASSWORD = "semarang123";
-// const char* WIFI_SSID = "POCO X6 5G";
-// const char* WIFI_PASSWORD = "estehangetpoll";
+const char* WIFI_SSID = "KelompokCuaca";
+const char* WIFI_PASSWORD = "esTeHangetSegar";
 
 // ===== BACKEND CONFIGURATION =====
 // Ganti dengan IP address komputer yang menjalankan backend (jika local)
 // atau domain server jika sudah di-hosting.
 // Contoh: "http://192.168.1.100:8000"
-// const char* BACKEND_URL = "http://192.168.1.100:8000";
 const char* BACKEND_URL = "https://api.azanifattur.biz.id";
 
 // ===== LED INDICATOR =====
